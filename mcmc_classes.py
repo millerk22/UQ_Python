@@ -74,8 +74,7 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
 
         else:
             samples = np.array([np.random.multivariate_normal(self.m[:,i], self.C,
-                            self.num_samples).T for i in range(self.Data.num_class)]).reshape(self.Data.N,
-                            self.Data.num_class, num_samples)
+                            self.num_samples).T for i in range(self.Data.num_class)]).transpose((1,0,2))
             self.u_mean = np.average(samples, axis=2)
             if f == 'thresh':
                 self.v_mean = threshold2D_avg(samples)

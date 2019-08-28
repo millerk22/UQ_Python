@@ -2,7 +2,7 @@ import numpy as np
 import scipy.sparse as sps
 import scipy.linalg as sla
 import matplotlib.pyplot as plt
-
+from itertools import permutations
 
 def threshold1D(u):
     u[u >= 0.0] = 1.
@@ -32,12 +32,11 @@ def threshold1D_avg(u_samples):
     return np.average(1.*(u_samples >= 0.), axis=1) # ith entry is estimated mean that ith node is of class 1
 
 def threshold2D_avg(u_samples):
-    print('deprecated... need to fix')
     N, num_class, n_samples = u_samples.shape
     thresh_ind = np.argmax(u_samples, axis=1)
     u_thresh_avg = np.zeros((N, num_class))
-    for i in range(num_class):
-        u_thresh_avg[:,i] = np.bincount(thresh_ind, axis=1)/N
+    for i in range(N):
+        u_thresh_avg[i,:] = np.bincount(thresh_ind[i,:],minlength=num_class)/n_samples
     return u_thresh_avg
 
 

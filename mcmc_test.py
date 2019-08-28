@@ -8,8 +8,10 @@ from IPython import embed
 if __name__ == "__main__":
     print("Running test of MCMC sampler, Gaussian Regression")
 
+    """
     # load the 2 moons data, plot initial distribution of labeled and unlabeled
     data = load_2_moons()
+    data.plot_initial()
 
     # Create the GR sampler, default params : gamma = 0.001, tau = 0.01, alpha = 1.0
     GR_sampler = Gaussian_Regression_Sampler()
@@ -19,10 +21,10 @@ if __name__ == "__main__":
     GR_sampler.run_sampler(10000)
     print(GR_sampler.u_mean.shape)
     print(GR_sampler.v_mean.shape)
-
-    #embed()
-
     """
+
+
+
     # load the 2 moons data, plot initial distribution of labeled and unlabeled
     Ns = [100,200,100]
     mus = [np.array([1., 0.]), np.array([-1., 0.]), np.array([1., 1.5])]
@@ -37,6 +39,6 @@ if __name__ == "__main__":
 
     # Get 100 samples (i.e. calculate the posterior mean and covariance, then sample)
     GR_sampler.run_sampler(100)
-    print(GR_sampler.samples.shape)
-    print(GR_sampler.samples_thresh[:5,:5])
-    """
+    print(GR_sampler.u_mean[:5,:])
+    print(GR_sampler.v_mean[:5,:])
+    embed()
