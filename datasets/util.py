@@ -12,7 +12,7 @@ def threshold1D(u):
 def threshold2D(u):
     thresh_ind = np.argmax(u, axis=1)
     u *= 0.
-    u[np.ix_([i for i in range(u.shape[0])], thresh_ind)] = 1.
+    u[[i for i in range(u.shape[0])], thresh_ind] = 1.
     return u
 
 def threshold2D_many(u_samples):
