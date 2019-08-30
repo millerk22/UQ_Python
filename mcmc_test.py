@@ -3,15 +3,20 @@ from datasets.dataloaders import *
 from datasets.util import *
 import numpy as np
 from IPython import embed
+import sys
+import time
+import argparse
+import matlab.engine
 
 
-if __name__ == "__main__":
-    print("Running test of MCMC sampler, Gaussian Regression")
 
-    """
+def test2moons(show_plot=False, run_ipy=False):
+    print("Running 2 moons test of MCMC sampler, Gaussian Regression")
     # load the 2 moons data, plot initial distribution of labeled and unlabeled
     data = load_2_moons()
-    data.plot_initial()
+    if show_plot:
+        data.plot_initial()
+
 
     # Create the GR sampler, default params : gamma = 0.001, tau = 0.01, alpha = 1.0
     GR_sampler = Gaussian_Regression_Sampler()
@@ -21,24 +26,82 @@ if __name__ == "__main__":
     GR_sampler.run_sampler(10000)
     print(GR_sampler.u_mean.shape)
     print(GR_sampler.v_mean.shape)
-    """
 
+    # embed the current namespace in an iPython session in the terminal
+    if run_ipy:
+        embed()
 
+    return
 
-    # load the 2 moons data, plot initial distribution of labeled and unlabeled
+def testG3_GR(show_plot=False, run_ipy=False):
+    print("Running Gaussian Cluster test of MCMC sampler, Gaussian Regression")
+    # load Gaussian Clusters data, plot initial distribution of labeled and unlabeled
     Ns = [100,200,100]
-    mus = [np.array([1., 0.]), np.array([-1., 0.]), np.array([1., 1.5])]
-    sigma = 0.2
+    mus = [np.array([1., 0.]), np.array([-1., 0.]), np.array([0., 1.5])]
+    sigma = 0.15
     Covs = [sigma*np.eye(2) for j in range(len(mus))]
     data = load_gaussian_cluster(Ns, mus, Covs)
-    data.plot_initial()
+    if show_plot:
+        data.plot_initial()
 
     # Create the GR sampler, default params : gamma = 0.001, tau = 0.01, alpha = 1.0
     GR_sampler = Gaussian_Regression_Sampler()
     GR_sampler.load_data(data)
 
     # Get 100 samples (i.e. calculate the posterior mean and covariance, then sample)
-    GR_sampler.run_sampler(100)
+    GR_sampler.run_sampler(1000)
     print(GR_sampler.u_mean[:5,:])
+    print(GR_sampler.m[:5,:])
     print(GR_sampler.v_mean[:5,:])
-    embed()
+
+    # embed the current namespace in an iPython session in the terminal
+    if run_ipy:
+        embed()
+
+    return
+
+def testG3_GPS(show_plot=False, run_ipy=False):
+    print("Running Gaussian Cluster test of MCMC sampler, Gibbs Probit")
+    # load Gaussian Clusters data, plot initial distribution of labeled and unlabeled
+    Ns = [100,200,100]
+    mus = [np.array([1., 0.]), np.array([-1., 0.]), np.array([0., 1.5])]
+    sigma = 0.15
+    Covs = [sigma*np.eye(2) for j in range(len(mus))]
+    data = load_gaussian_cluster(Ns, mus, Covs)
+    if show_plot:
+        data.plot_initial()
+
+    # Create the GR sampler, default params : gamma = 0.001, tau = 0.01, alpha = 1.0
+    GPS = Gibbs_Probit_Sampler()
+    GPS.load_data(data)
+
+    # Get 100 samples (i.e. calculate the posterior mean and covariance, then sample)
+    GPS.run_sampler(1000)
+
+    # embed the current namespace in an iPython session in the terminal
+    if run_ipy:
+        embed()
+
+    return
+
+
+if __name__ == "__main__":
+
+    # Test script command line parameter parsing
+    show_plot = False
+    run_ipy = False
+    if len(sys.argv) > 1:
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--show')
+        parser.add_argument('--embed')
+        args = parser.parse_args()
+        if args.show is not None:
+            show_plot = int(args.show)
+        if args.embed is not None:
+            run_ipy = int(args.embed)
+
+
+
+    #test2moons(show_plot, run_ipy)
+    #testG3_GR(show_plot, run_ipy)
+    testG3_GPS(show_plot, run_ipy)

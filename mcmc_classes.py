@@ -2,6 +2,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datasets.util import calc_orig_multi, threshold1D, threshold2D
 from datasets.util import threshold2D_many, threshold2D_avg, threshold1D_avg
+import scipy.sparse as sps
+import emcee
+import matlab.engine
+
 
 
 class MCMC_Sampler(object):
@@ -60,18 +64,24 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
                 self.m : (N x num_class) numpy array analytical mean (GR-special)
                 self.C : (N x N) numpy array analytical covariance operator (GR-special)
                 self.y : (N' x num_class) numpy array of labelings on labeled set
+
+        Note that for the binary case, we have {-1,+1} classes and the entries of self.v_mean
+        represent the empirical probability of being class +1 from the samples.
         """
         MCMC_Sampler.run_sampler(self, num_samples)
 
         ## run Gaussian Regression method here -- ignoring burnIn
         self.m, self.C, self.y = calc_orig_multi(self.Data.evecs, self.Data.evals, self.Data.fid,
                                 self.Data.labeled, self.Data.unlabeled, self.tau, self.alpha, self.gamma2)
+
+        # binary class case
         if self.Data.num_class == 2:
             samples = np.random.multivariate_normal(self.m, self.C, num_samples).T
             self.u_mean = np.average(samples, axis=1)
             if f == 'thresh':
                 self.v_mean = threshold1D_avg(samples)
 
+        # multiclass sampling case
         else:
             samples = np.array([np.random.multivariate_normal(self.m[:,i], self.C,
                             self.num_samples).T for i in range(self.Data.num_class)]).transpose((1,0,2))
@@ -79,21 +89,57 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
             if f == 'thresh':
                 self.v_mean = threshold2D_avg(samples)
 
+        # delete the samples for sake of memory
         del samples
 
 
 
 
 class Gibbs_Probit_Sampler(MCMC_Sampler):
-    def __init__(self, gamma, tau=0., alpha=1.):
+    def __init__(self, gamma=0.01, tau=0., alpha=1.):
         MCMC_Sampler.__init__(self, gamma, tau, alpha)
 
     def load_data(self, Data, plot_=False):
         MCMC_Sampler.load_data(self, Data, plot_)
 
+        # initiate the trandn_multiclass object
+        print('Instantiating the matlab objects for trandn_multiclass sampler')
+        self.eng = matlab.engine.start_matlab()
+        self.eng.evalc("trand_obj = trandn_multiclass(%s);" % str(Data.num_class))
+        print('Finished MATLAB initialization')
+
+
     def run_sampler(self, num_samples, burnIn=0):
         MCMC_Sampler.run_sampler(self, num_samples, burnIn)
-        ## run Gibbs Probit method here
+
+        # instantiate the v_mean (thresh), u_mean (unthres) variables
+        self.v_mean = np.zeros((self.Data.N, self.Data.num_class))
+        self.u_mean = np.zeros_like(self.v_mean)
+
+        # fixed initialization of u
+        self.u = np.zeros_like(self.u_mean)
+        for c, ind in self.Data.fid.items():
+            self.u[np.ix_(ind, len(ind)*[c])] = 1.
+
+        # sample Gaussian noise in batch to begin
+        z_all = np.random.randn(len(self.Data.evals), self.Data.num_class, num_samples)
+
+        """ Could do the permutation to put fidelity indices at beginning -- choosing not to for right now"""
+
+        V_KJ = self.Data.evecs[self.Data.labeled,:]
+        P_KJ = (1./self.gamma2)*V_KJ.T.dot(V_KJ)
+        evals = self.Data.evals
+        for i in range(self.Data.N):
+            P_KJ[i,i] += evals[i]
+        print(P_KJ.shape)
+        #P_KJ = 0.5*(P_KJ + P_KJ.T)  # do we need? seems to be symmetric already...
+
+        return
+
+
+
+
+
 
 
 
@@ -125,3 +171,59 @@ class pCN_BLS_Sampler(MCMC_Sampler):
         MCMC_Sampler.run_sampler(self, num_samples, burnIn)
 
         ## run pCN BLS method here
+
+
+
+
+
+"""
+print('Testing the get_truncn_samples function')
+tic = time.clock()
+eng = matlab.engine.start_matlab() # need to put in different place
+print('start_matlab took %f' % (time.clock() - tic))
+
+
+# need to get the object u into the matlab engine
+tic = time.clock()
+eng.evalc("trand_obj = trandn_multiclass(%s);" % str(data.num_class))
+print('trandn_multiclass instantiation took %f' % (time.clock() - tic))
+
+i = 0
+tic = time.clock()
+u = GR_sampler.m[:100,:].tolist()
+eng.workspace['u'] = matlab.double(u)
+#command = "s = trand_obj.gen_samples(u, %f, %d);" % (GR_sampler.gamma2, i+1)
+#eng.evalc(command, nargout=0)
+eng.evalc("s = trand_obj.gen_samples(u, %f, %d);" % (GR_sampler.gamma2, i+1), nargout=0)
+s = np.array(eng.workspace['s'])
+print('sampling took %f' % (time.clock() - tic))
+print(s.shape)
+for j in range(s.shape[0]):
+    if np.any(s[j,:] > s[j,i]):
+        print(s[j,:])
+        print(s[j,i])
+
+
+
+
+def ln_truncn(x, mean, gamma2, i):
+    if np.any(x) > x[i]:
+        return -np.inf
+    else:
+        diff = x - mean
+        if len(mean.shape) > 1:
+            nc = mean.shape[1]
+            return np.sum([np.inner(diff[:,j], diff[:,j]) for j in range(nc)])/(-2.*gamma2)
+        else:
+            return np.inner(diff,diff)/(-2.*gamma2)
+
+
+def get_truncn_samples(u, gamma2, i, num_steps=1000):
+    mean = u.flatten()
+    Ndim = mean.shape[0]
+    Nwalkers = Ndim*3
+    S = emcee.EnsembleSampler(Nwalkers, Ndim, ln_truncn, args = (u, gamma2, i))
+    positions = emcee.utils.sample_ball(mean, Ndim*[np.sqrt(gamma2)], size=Nwalkers)
+    positions, _, _ = S.run_mcmc(positions,num_steps)
+    return positions
+"""
