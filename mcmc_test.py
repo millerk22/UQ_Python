@@ -76,13 +76,46 @@ def testG3_GPS(show_plot=False, run_ipy=False):
     GPS.load_data(data)
 
     # Get 100 samples (i.e. calculate the posterior mean and covariance, then sample)
+    tic = time.process_time()
     GPS.run_sampler(1000)
+    print('Sampling took %f seconds ' % (time.process_time() - tic))
 
     # embed the current namespace in an iPython session in the terminal
     if run_ipy:
         embed()
 
     return
+
+
+def testMNIST(run_ipy=False):
+    print('Running MNIST test with Gibbs_Probit_Sampler\n')
+    mnist = load_MNIST()
+    mnist.get_useful_structs()
+
+    GPS = Gibbs_Probit_Sampler()
+    GPS.load_data(mnist)
+
+    print('\nRunning Sampling...')
+    tic = time.process_time()
+    GPS.run_sampler(1000, burnIn=100)
+    print('\tGPS Sampling took %f seconds' % (time.process_time() - tic))
+
+
+    print('\n\nRunning Gaussian Regression Sampler')
+    GR = Gaussian_Regression_Sampler()
+    GR.load_data(mnist)
+
+    print('\nRunning Sampling...')
+    tic = time.process_time()
+    GR.run_sampler(1100)
+    print('\tGR Sampling took %f seconds' % (time.process_time() - tic))
+
+
+    if run_ipy:
+        embed()
+
+
+
 
 
 if __name__ == "__main__":
@@ -104,4 +137,5 @@ if __name__ == "__main__":
 
     #test2moons(show_plot, run_ipy)
     #testG3_GR(show_plot, run_ipy)
-    testG3_GPS(show_plot, run_ipy)
+    #testG3_GPS(show_plot, run_ipy)
+    testMNIST(run_ipy )
