@@ -1,12 +1,19 @@
 import numpy as np
 import scipy.sparse as sps
 import scipy.linalg as sla
-from sklearn.datasets import make_moons
+from sklearn.datasets import make_moons, load_digits
 from .util import plot_iter_multi, plot_iter, calc_stats_multi
+import os
+import requests
+from io import BytesIO
+from zipfile import ZipFile
+import gzip
+import matplotlib.pyplot as plt
 
 
-## TODO: Need a way to have an "original" fid dictionary, that can then pass to
-# different runs of Active Learning with UQ samples.
+"""TODO: Need a way to have an "original" fid dictionary, that can then pass to
+ different runs of Active Learning with UQ samples. Or just have function to
+ undo all of the added fidelity points."""
 class Data_obj(object):
     def __init__(self, X, evals, evecs, fid, ground_truth):
         self.X = X
@@ -18,6 +25,7 @@ class Data_obj(object):
         self.classes = list(self.fid.keys())
         self.num_class = len(self.classes)
         self.have_useful = False
+        #self.get_useful_structs()  # maybe call this function right away instead of waiting?
 
     def get_useful_structs(self):
         self.org_indices = []  # org_indices organizes indices of nodes according to ground truth class assignments
@@ -38,11 +46,13 @@ class Data_obj(object):
 
 
     def plot_initial(self):
-        if self.X.shape[1] > 2:
-            print('Sorry, plotting for higher dimensional datasets is not yet implemented..')
-            return
         if not self.have_useful:
             self.get_useful_structs()
+        if self.X is None:
+            raise ValueError('Sorry data points in ambient space were not saved...')
+        if self.X.shape[1] > 2:
+            raise NotImplementedError('Sorry, plotting for higher dimensional datasets is not yet implemented..')
+
         if min(self.classes) == -1:
             _, stats = calc_stats_multi(self.ground_truth, self.fid, self.gt_flipped)
             plot_iter(stats, self.X, k_next=-1)
@@ -59,6 +69,10 @@ class Data_obj(object):
     def plot_iteration(self, u):
         if not self.have_useful:
             self.get_useful_structs()
+        if self.X is None:
+            raise ValueError('Sorry data points in ambient space were not saved...')
+        if self.X.shape[1] > 2:
+            raise NotImplementedError('Sorry, plotting for higher dimensional datasets is not yet implemented..')
         if min(self.classes) == -1:
             _, stats = calc_stats_multi(self.ground_truth, self.fid, self.gt_flipped)
             plot_iter(stats, self.X, k_next=-1)
@@ -72,7 +86,7 @@ class Data_obj(object):
             plot_iter_multi(stats, self.X, self.fid, k_next=-1)
 
 
-    ### function to reset Data object to orig labeled, fid, unlabeled
+    ### function to reset Data object to orig labeled, fid, unlabeled?
 
 
 
@@ -127,6 +141,101 @@ def load_gaussian_cluster(Ns, means, covs, sup_percent=0.05, normed_lap=False):
         fid[i] = list(i_mask[:int(sup_percent*n_i)])
 
     return Data_obj(X, evals, evecs, fid, ground_truth)
+
+def load_MNIST(digits=[1,4,7,9], num_points=4*[500], num_eig=300, Ltype='n', sup_percent=0.05, seed=10, full=True):
+    if len(digits) != len(num_points):
+        raise ValueError('Length of digits and num_points must be the same')
+
+    # filepath and filename creation for checking if this data has already been computed before
+    filename = "".join([str(d)+"_" for d in digits])
+    filename += "".join([str(n)+"_" for n in num_points])
+    filename += "%d_%s_%d.npz" % (num_eig, Ltype, int(100*sup_percent))
+    file_path = "./datasets/MNIST/"
+    if os.path.isfile(file_path + filename):
+        print('Found MNIST data already saved\n')
+        mnist = np.load(file_path+filename)
+        X, evals, evecs, ground_truth = mnist['X'], mnist['evals'], mnist['evecs'], mnist['ground_truth']
+        np.random.seed(seed) # set the random seed to allow for consistency in choosing fidelity point
+        fid = {}
+        for i in np.unique(ground_truth).astype(int):
+            i_ind = np.where(ground_truth == i)[0]
+            np.random.shuffle(i_ind)
+            fid[i] = list(i_ind[:int(sup_percent*num_points[i])])
+
+    else:
+        print("Couldn't find already saved MNIST data for the given setup, downloading from http://yann.lecun.com/exdb/mnist/")
+
+        """ Loading data from MNIST website"""
+        resp = requests.get('http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz').content
+        file = BytesIO(resp)
+        f = gzip.open(file, 'r')
+        f.read(16)
+        num_images = 60000  # read ALL the images
+        img_size = 28
+        buf = f.read(img_size * img_size * num_images)
+        imgs = np.frombuffer(buf, dtype=np.uint8).astype(np.float32)
+        imgs = imgs.reshape(num_images, img_size * img_size)
+
+        resp = requests.get('http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz').content
+        file = BytesIO(resp)
+        f = gzip.open(file, 'r')
+        f.read(8)
+        buf = f.read(num_images)
+        labels = np.frombuffer(buf, dtype=np.uint8)
+
+        """ Processing to get the desired subset of digits"""
+        np.random.seed(seed+1)
+        dig_ind = []
+        for j in range(len(digits)):
+            d_ind = np.where(labels == digits[j])[0]
+            np.random.shuffle(d_ind)
+            dig_ind.extend(list(d_ind[:num_points[j]]))
+
+
+        """ Define fid, ground_truth, and X datums"""
+        np.random.seed(seed)
+        X = imgs[dig_ind, :]
+        labels_sub = labels[dig_ind]
+        ground_truth = np.zeros(len(dig_ind))
+        fid = {}
+        for i in range(len(digits)):
+            i_ind = np.where(labels_sub == digits[i])[0]
+            ground_truth[i_ind] = i
+            np.random.shuffle(i_ind)
+            fid[i] = list(i_ind[:int(sup_percent*num_points[i])])
+
+        """ Create the similarity graph and calculate eigenval/vecs """
+        W = make_sim_graph(X, k_nn=15)
+        if Ltype == 'n':
+            evals, evecs = get_eig_Lnorm(W, normed_=True)
+        else:
+            evals, evecs = get_eig_Lnorm(W, normed_=False)
+
+        # whether or not we will be keeping track of the FULL dataset
+        if not full:
+            X = None
+
+        print('Saving MNIST data to %s' % (file_path+filename))
+        # NOT SAVING fid, since will allow for different runs on fidelity
+        np.savez(file_path + filename, X=X, evals=evals, evecs=evecs, ground_truth=ground_truth)
+
+    return Data_obj(X, evals, evecs, fid, ground_truth)
+
+
+
+"""
+for i in dig_ind:
+    plt.imshow(imgs[i,:].reshape(28,28))
+    plt.title('class = %d' % labels[i])
+    plt.show()
+"""
+
+
+def load_HUJI():
+    pass
+
+def load_gas_plume():
+    pass
 
 
 

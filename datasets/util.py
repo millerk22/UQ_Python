@@ -165,7 +165,7 @@ def plot_iter_multi(stats, X, fid, k_next=-1):
 
 
 
-def calc_orig_multi(v, w, fid, labeled, unlabeled, tau, alpha, gamma2):
+def calc_GR_posterior(v, w, fid, labeled, unlabeled, tau, alpha, gamma2):
     N = v.shape[0]
     classes = fid.keys()
     num_class = len(classes)

@@ -1,9 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from datasets.util import calc_orig_multi, threshold1D, threshold2D
+from datasets.util import calc_GR_posterior, threshold1D, threshold2D
 from datasets.util import threshold2D_many, threshold2D_avg, threshold1D_avg
 import scipy.sparse as sps
+from scipy.linalg import eigh
 import emcee
+import time
 import matlab.engine
 
 
@@ -71,7 +73,7 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
         MCMC_Sampler.run_sampler(self, num_samples)
 
         ## run Gaussian Regression method here -- ignoring burnIn
-        self.m, self.C, self.y = calc_orig_multi(self.Data.evecs, self.Data.evals, self.Data.fid,
+        self.m, self.C, self.y = calc_GR_posterior(self.Data.evecs, self.Data.evals, self.Data.fid,
                                 self.Data.labeled, self.Data.unlabeled, self.tau, self.alpha, self.gamma2)
 
         # binary class case
@@ -79,7 +81,7 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
             samples = np.random.multivariate_normal(self.m, self.C, num_samples).T
             self.u_mean = np.average(samples, axis=1)
             if f == 'thresh':
-                self.v_mean = threshold1D_avg(samples)
+                self.u_t_mean = threshold1D_avg(samples)
 
         # multiclass sampling case
         else:
@@ -87,10 +89,11 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
                             self.num_samples).T for i in range(self.Data.num_class)]).transpose((1,0,2))
             self.u_mean = np.average(samples, axis=2)
             if f == 'thresh':
-                self.v_mean = threshold2D_avg(samples)
+                self.u_t_mean = threshold2D_avg(samples)
 
         # delete the samples for sake of memory
         del samples
+        return
 
 
 
@@ -103,36 +106,78 @@ class Gibbs_Probit_Sampler(MCMC_Sampler):
         MCMC_Sampler.load_data(self, Data, plot_)
 
         # initiate the trandn_multiclass object
-        print('Instantiating the matlab objects for trandn_multiclass sampler')
+        print("Gibbs Probit Sampler's current implementation uses MATLAB functions...")
+        print('\tInstantiating the matlab objects for trandn_multiclass sampler')
+        tic = time.process_time()
         self.eng = matlab.engine.start_matlab()
+        print('\tmatlab engine instantiation took %s seconds' % str(time.process_time() - tic ))
         self.eng.evalc("trand_obj = trandn_multiclass(%s);" % str(Data.num_class))
-        print('Finished MATLAB initialization')
+        self.eng.evalc("fid = {};")
+        for c, ind in self.Data.fid.items():
+            self.eng.evalc("fid{%d} = %s;"%(c+1,str([a+ 1 for a in ind])))
+        print('\tFinished MATLAB initialization')
 
 
-    def run_sampler(self, num_samples, burnIn=0):
+    def run_sampler(self, num_samples, burnIn=0, f='thresh'):
         MCMC_Sampler.run_sampler(self, num_samples, burnIn)
 
-        # instantiate the v_mean (thresh), u_mean (unthres) variables
-        self.v_mean = np.zeros((self.Data.N, self.Data.num_class))
-        self.u_mean = np.zeros_like(self.v_mean)
+        # instantiate the u_mean (unthresh), u_t_mean (unthres) variables
+        self.u_mean = np.zeros((self.Data.N, self.Data.num_class))
+        self.u_t_mean = np.zeros_like(self.u_mean)
 
-        # fixed initialization of u
-        self.u = np.zeros_like(self.u_mean)
+        # fixed initialization of u.
+        u = np.zeros_like(self.u_mean)
+
+        # fidv contains the indices of the fidelity nodes in the list "labeled"
+        fidv = {}
         for c, ind in self.Data.fid.items():
-            self.u[np.ix_(ind, len(ind)*[c])] = 1.
+            u[np.ix_(ind, len(ind)*[c])] = 1.
+            fidv[c] = [self.Data.labeled.index(j) for j in ind]
 
         # sample Gaussian noise in batch to begin
-        z_all = np.random.randn(len(self.Data.evals), self.Data.num_class, num_samples)
+        z_all = np.random.randn(len(self.Data.evals), self.Data.num_class, num_samples+burnIn)
 
-        """ Could do the permutation to put fidelity indices at beginning -- choosing not to for right now"""
-
+        # Compute the projections for use in the KL expansion for sampling u | v
         V_KJ = self.Data.evecs[self.Data.labeled,:]
         P_KJ = (1./self.gamma2)*V_KJ.T.dot(V_KJ)
-        evals = self.Data.evals
         for i in range(self.Data.N):
-            P_KJ[i,i] += evals[i]
-        print(P_KJ.shape)
+            P_KJ[i,i] += self.Data.evals[i]
         #P_KJ = 0.5*(P_KJ + P_KJ.T)  # do we need? seems to be symmetric already...
+        S_KJ, Q_KJ = eigh(P_KJ)
+        inv_skj = 1./np.sqrt(S_KJ)[:,np.newaxis]
+
+        # Main iterations
+        for k in range(burnIn + num_samples):
+            z_k = z_all[:,:,k] # the white noise samples for use in sampling u | v
+
+            # Sample v ~ P(v | u). Uses the MATLAB function for trandn_multiclass MATLAB object
+            v = np.zeros((len(self.Data.labeled), self.Data.num_class))
+            #tic = time.process_time()
+            for cl, ind_cl in self.Data.fid.items():
+                self.eng.workspace['u_cl'] = matlab.double(u[ind_cl,:].tolist())
+                self.eng.evalc("v_cl = trand_obj.gen_samples(u_cl, %f, %d);" % (self.gamma2**0.5, cl+1))
+                v[fidv[cl],:] = np.asarray(self.eng.workspace['v_cl'])
+
+
+            # Sample u ~ P(u | v) via KL expansion
+            temp = V_KJ.T.dot(v)/self.gamma2
+            temp = Q_KJ.T.dot(temp)
+            temp *= inv_skj
+            m_hat = Q_KJ.dot(temp)
+            u_hat = Q_KJ.dot(z_k * inv_skj) + m_hat
+            u = self.Data.evecs.dot(u_hat)
+
+            # If past the burn in period, calculate the updates to the means we're recording
+            if k > burnIn:
+                k_rec = k - burnIn
+                if k_rec == 1:
+                    self.u_mean = u
+                    if f == 'thresh':
+                        self.u_t_mean = threshold2D(u)
+                else:
+                    self.u_mean = ((k_rec-1) * self.u_mean + u)/k_rec
+                    if f == 'thresh':
+                        self.u_t_mean = ((k_rec-1) * self.u_t_mean + threshold2D(u))/k_rec
 
         return
 
