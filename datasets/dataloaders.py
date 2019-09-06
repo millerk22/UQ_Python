@@ -5,6 +5,7 @@ from sklearn.datasets import make_moons, load_digits
 from .util import plot_iter_multi, plot_iter, calc_stats_multi
 import os
 import requests
+import pickle
 from io import BytesIO
 from zipfile import ZipFile
 import gzip
@@ -142,15 +143,20 @@ def load_gaussian_cluster(Ns, means, covs, sup_percent=0.05, normed_lap=False):
 
     return Data_obj(X, evals, evecs, fid, ground_truth)
 
-def load_MNIST(digits=[1,4,7,9], num_points=4*[500], num_eig=300, Ltype='n', sup_percent=0.05, seed=10, full=True):
+def load_MNIST(digits=[1,4,7,9], num_points=4*[500], num_eig=300, Ltype='n', sup_percent=0.05, k_nn=14, seed=10, full=True):
     if len(digits) != len(num_points):
         raise ValueError('Length of digits and num_points must be the same')
 
     # filepath and filename creation for checking if this data has already been computed before
     filename = "".join([str(d)+"_" for d in digits])
     filename += "".join([str(n)+"_" for n in num_points])
-    filename += "%d_%s_%d.npz" % (num_eig, Ltype, int(100*sup_percent))
+    filename += "%d_%s_%d.npz" % (num_eig, Ltype, k_nn)
     file_path = "./datasets/MNIST/"
+
+    if not os.path.exists(file_path):
+        print('Folder for MNIST not already created, creating...')
+        os.mkdir(file_path)
+
     if os.path.isfile(file_path + filename):
         print('Found MNIST data already saved\n')
         mnist = np.load(file_path+filename)
@@ -161,6 +167,8 @@ def load_MNIST(digits=[1,4,7,9], num_points=4*[500], num_eig=300, Ltype='n', sup
             i_ind = np.where(ground_truth == i)[0]
             np.random.shuffle(i_ind)
             fid[i] = list(i_ind[:int(sup_percent*num_points[i])])
+
+        del mnist
 
     else:
         print("Couldn't find already saved MNIST data for the given setup, downloading from http://yann.lecun.com/exdb/mnist/")
@@ -205,11 +213,11 @@ def load_MNIST(digits=[1,4,7,9], num_points=4*[500], num_eig=300, Ltype='n', sup
             fid[i] = list(i_ind[:int(sup_percent*num_points[i])])
 
         """ Create the similarity graph and calculate eigenval/vecs """
-        W = make_sim_graph(X, k_nn=15)
+        W = make_sim_graph(X, k_nn=k_nn)
         if Ltype == 'n':
-            evals, evecs = get_eig_Lnorm(W, normed_=True)
+            evals, evecs = get_eig_Lnorm(W, num_eig=num_eig, normed_=True)
         else:
-            evals, evecs = get_eig_Lnorm(W, normed_=False)
+            evals, evecs = get_eig_Lnorm(W, num_eig=num_eig, normed_=False)
 
         # whether or not we will be keeping track of the FULL dataset
         if not full:
@@ -231,10 +239,55 @@ for i in dig_ind:
 """
 
 
-def load_HUJI():
-    pass
 
-def load_gas_plume():
+
+def load_gas_plume(num_eig=1000, Ltype='n', sup_percent=0.05, k_nn=15, seed=10):
+    # filepath and filename creation for checking if this data has already been computed before
+    filename = "%d_%s_%d.npz" % (num_eig, Ltype, k_nn)
+    file_path = "./datasets/GasPlume/"
+
+    if not os.path.exists(file_path):
+        print('Folder for Gas Plume not already created, creating...')
+        os.mkdir(file_path)
+
+    if os.path.isfile(file_path + filename):
+        print('Found Gas Plume data already saved\n')
+        GP = np.load(file_path+filename)
+        X, evals, evecs, ground_truth = GP['X'], GP['evals'], GP['evecs'], GP['ground_truth']
+        del GP
+        np.random.seed(seed) # set the random seed to allow for consistency in choosing fidelity point
+        fid = {}
+        for i in np.unique(ground_truth).astype(int):
+            i_ind = np.where(ground_truth == i)[0]
+            np.random.shuffle(i_ind)
+            fid[i] = list(i_ind[:int(sup_percent*num_points[i])])
+
+    else:
+        print("Didn't find already saved with parameter settings... calculating anew")
+        if os.path.exists(file_path + "*.npz"):
+            print('Using other graph construction for this specific param setting...')
+        else:
+            raise NotImplementedError('Havent implemented the capability to calculate all the data here')
+
+
+
+
+    if os.path.isfile(file_path + filename):
+        return Data_obj(X, evals, evecs, fid, ground_truth)
+    else:
+        pass
+
+
+
+
+
+
+
+    return X, ground_truth
+
+
+
+def load_HUJI():
     pass
 
 
@@ -299,9 +352,12 @@ def generate_data_graphs(Ns, means, Covs, k_nn=5):
     return X, W, ground_truth
 
 
-def get_eig_Lnorm(W, return_L=False, normed_=True):
+def get_eig_Lnorm(W, num_eig=300, normed_=True, return_L=False):
+    print('Creating Laplacian')
     L_sym = sps.csgraph.laplacian(W, normed=normed_)
-    [w, v] = sla.eigh(L_sym.toarray())
+    print('Finished making Laplacian, now calculating the eval/evecs')
+    #[w, v] = sla.eigh(L_sym.toarray(), eigvals=(0,num_eig-1))
+    w, v = sps.linalg.eigsh(L_sym, k=num_eig)
     if return_L:
         return w, v, L_sym.toarray()
     return w, v

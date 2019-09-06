@@ -9,8 +9,10 @@ def threshold1D(u):
     u[u < 0.0] = -1.
     return u
 
-def threshold2D(u):
+def threshold2D(u, one_hot=True):
     thresh_ind = np.argmax(u, axis=1)
+    if not one_hot:
+        return thresh_ind
     u *= 0.
     u[[i for i in range(u.shape[0])], thresh_ind] = 1.
     return u

@@ -2,3 +2,7 @@
 **/ datasets/__pycache__/
 util_hf.py
 **/datasets/MNIST/
+gp_convert.py
+gp_convert_remote.py
+**datasets/GasPlume/
+
