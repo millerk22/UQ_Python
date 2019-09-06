@@ -34,7 +34,27 @@ class MCMC_Sampler(object):
 
     def comp_mcmc_stats(self):
         # Confusion matrix, recall, precision, recall_conf, precision_conf, acc
-        pass
+        if self.Data is None:
+            raise ValueError('Data is not loaded..')
+        if self.u_mean is None:
+            raise ValueError('Have not sampled yet... need to run sampler to obtain stats.')
+
+        # Calculate accuracy
+        if -1 in self.Data.fid.keys():
+            u_mean_t = threshold1D(self.u_mean)
+            u_t_mean_t = threshold1D(self.u_t_mean)
+
+        else:
+            u_mean_t = threshold2D(self.u_mean, False)
+            u_t_mean_t = threshold2D(self.u_t_mean, False)
+
+
+        err_u = len(np.where(u_mean_t != self.Data.ground_truth)[0])/self.Data.N
+        err_u_t = len(np.where(u_t_mean_t != self.Data.ground_truth)[0])/self.Data.N
+        self.acc_u = 1. - err_u
+        self.acc_u_t = 1. - err_u_t
+
+        return self.acc_u, self.acc_u_t
 
 
     def active_learning_choices(self, method, num_to_label):
@@ -95,6 +115,18 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
         del samples
         return
 
+    def comp_mcmc_stats(self):
+        self.acc_u, self.acc_u_t = MCMC_Sampler.comp_mcmc_stats(self)
+        """ In addition to the stats from the sampling from the posterior, calculate
+        accuracy of thresholded analytic posterior mean, threshold*D(self.m)"""
+        if -1 in self.Data.fid.keys():
+            m_t = threshold1D(self.m)
+        else:
+            m_t = threshold2D(self.m, False)
+        self.acc_m = len(np.where(m_t == self.Data.ground_truth)[0])/self.Data.N
+        return self.acc_u, self.acc_u_t
+
+
 
 
 
@@ -140,7 +172,7 @@ class Gibbs_Probit_Sampler(MCMC_Sampler):
         # Compute the projections for use in the KL expansion for sampling u | v
         V_KJ = self.Data.evecs[self.Data.labeled,:]
         P_KJ = (1./self.gamma2)*V_KJ.T.dot(V_KJ)
-        for i in range(self.Data.N):
+        for i in range(len(self.Data.evals)):
             P_KJ[i,i] += self.Data.evals[i]
         #P_KJ = 0.5*(P_KJ + P_KJ.T)  # do we need? seems to be symmetric already...
         S_KJ, Q_KJ = eigh(P_KJ)
