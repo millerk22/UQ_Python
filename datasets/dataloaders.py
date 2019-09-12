@@ -22,7 +22,7 @@ class Data_obj(object):
         self.evecs = evecs
         self.fid = fid
         self.ground_truth = ground_truth
-        self.N = self.X.shape[0]
+        self.N = self.ground_truth.shape[0]
         self.classes = list(self.fid.keys())
         self.num_class = len(self.classes)
         self.have_useful = False
@@ -143,7 +143,7 @@ def load_gaussian_cluster(Ns, means, covs, sup_percent=0.05, normed_lap=False):
 
     return Data_obj(X, evals, evecs, fid, ground_truth)
 
-def load_MNIST(digits=[1,4,7,9], num_points=4*[500], num_eig=300, Ltype='n', sup_percent=0.05, k_nn=14, seed=10, full=True):
+def load_MNIST(digits=[1,4,7,9], num_points=4*[500], num_eig=300, Ltype='n', sup_percent=0.05, k_nn=15, seed=10, full=True):
     if len(digits) != len(num_points):
         raise ValueError('Length of digits and num_points must be the same')
 
@@ -206,11 +206,23 @@ def load_MNIST(digits=[1,4,7,9], num_points=4*[500], num_eig=300, Ltype='n', sup
         labels_sub = labels[dig_ind]
         ground_truth = np.zeros(len(dig_ind))
         fid = {}
-        for i in range(len(digits)):
-            i_ind = np.where(labels_sub == digits[i])[0]
-            ground_truth[i_ind] = i
-            np.random.shuffle(i_ind)
-            fid[i] = list(i_ind[:int(sup_percent*num_points[i])])
+        if len(digits) == 2: # Binary case -- make the classes -1, 1
+            m1_ind = np.where(labels_sub == digits[0])[0]
+            ground_truth[m1_ind] = -1
+            np.random.shuffle(m1_ind)
+            fid[-1] = list(m1_ind[:int(sup_percent*num_points[0])])
+
+            p1_ind = np.where(labels_sub == digits[1])[0]
+            ground_truth[p1_ind] = 1
+            np.random.shuffle(p1_ind)
+            fid[1] = list(p1_ind[:int(sup_percent*num_points[1])])
+
+        else:
+            for i in range(len(digits)):
+                i_ind = np.where(labels_sub == digits[i])[0]
+                ground_truth[i_ind] = i
+                np.random.shuffle(i_ind)
+                fid[i] = list(i_ind[:int(sup_percent*num_points[i])])
 
         """ Create the similarity graph and calculate eigenval/vecs """
         W = make_sim_graph(X, k_nn=k_nn)
@@ -260,7 +272,7 @@ def load_gas_plume(num_eig=1000, Ltype='n', sup_percent=0.05, k_nn=15, seed=10):
         for i in np.unique(ground_truth).astype(int):
             i_ind = np.where(ground_truth == i)[0]
             np.random.shuffle(i_ind)
-            fid[i] = list(i_ind[:int(sup_percent*num_points[i])])
+            fid[i] = list(i_ind[:int(sup_percent*len(i_ind))])
 
     else:
         print("Didn't find already saved with parameter settings... calculating anew")
@@ -319,7 +331,7 @@ def make_sim_graph(X, k_nn=5):
     J = ind_knn.flatten()
     Dmean = (np.sum(Dknn, axis=1)/k_nn).reshape(N,1)
     w_sp = np.divide(Dknn, Dmean)
-    w_sp = np.exp(-(w_sp * w_sp))
+    w_sp = np.exp(-(w_sp * w_sp)/3.)
     W = sps.csr_matrix((w_sp.flatten() , (I, J)), shape=(N,N))
     W = 0.5*(W+W.T)
 
@@ -357,7 +369,7 @@ def get_eig_Lnorm(W, num_eig=300, normed_=True, return_L=False):
     L_sym = sps.csgraph.laplacian(W, normed=normed_)
     print('Finished making Laplacian, now calculating the eval/evecs')
     #[w, v] = sla.eigh(L_sym.toarray(), eigvals=(0,num_eig-1))
-    w, v = sps.linalg.eigsh(L_sym, k=num_eig)
+    w, v = sps.linalg.eigsh(L_sym, k=num_eig, which='SM')
     if return_L:
         return w, v, L_sym.toarray()
     return w, v

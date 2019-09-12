@@ -7,6 +7,7 @@ import sys
 import time
 import argparse
 import matlab.engine
+from datasets.trnm import TruncRandNormMulticlass
 
 
 
@@ -118,20 +119,91 @@ def testMNIST(run_ipy=False):
     print("Accuracy of GPS: acc_u = %f, acc_u_t = %f" % (gps_acc_u, gps_acc_u_t))
 
 
-
-
-
-
-
     if run_ipy:
         embed()
 
 
 
 def testGP_GR(run_ipy=False):
-    X, gt = load_gas_plume()
+    gas_data = load_gas_plume()
+    gas_data.get_useful_structs()
+
+    GR = Gaussian_Regression_Sampler()
+    GR.load_data(gas_data)
+
+    num_samples = 1500
+    print("Running GR Sampler for %d points on Gas Plume data" % num_samples)
+    tic =time.process_time()
+    GR.run_sampler(1500)
+    toc = time.process_time()
+    print('\tSampling took %f seconds' % (toc - tic))
+
     if run_ipy:
         embed()
+
+def test_pCnProb(run_ipy=False):
+    beta = 0.3
+    #print("Preparing pCN_Probit_Sampler test with 2 moons data, beta = %f" % beta)
+    #data = load_2_moons()
+    print("Preparing pCN_Probit_Sampler test with MNIST data, beta = %f" % beta)
+    data = load_MNIST(digits=[4,9], num_points=[1000,1000], sup_percent=0.3)
+
+
+    pcnprob = pCN_Probit_Sampler(beta=beta)
+    #pcnprob = pCN_BLS_Sampler(beta=beta)
+    pcnprob.load_data(data)
+
+    GAMMAS = [0.1**j for j in range(4)]
+    for gamma in GAMMAS[::-1]:
+        pcnprob.gamma = gamma
+        print('gamma = %f' % gamma)
+        print('Running sampling...')
+        pcnprob.run_sampler(1000, burnIn=500)
+        print('Sampling finished, calculating statistics...')
+
+        acc_u, acc_u_t = pcnprob.comp_mcmc_stats()
+        print("Accuracy of pCN BLS: acc_u = %f, acc_u_t = %f" % (acc_u, acc_u_t))
+        print()
+        pcnprob.plot_u(pcnprob.u_mean)
+
+    if run_ipy:
+        embed()
+
+
+def test_GProb2(run_ipy=False):
+    print("Preparing Gibbs-Probit comparison test with MNIST data")
+    data = load_MNIST()
+
+
+    """
+    print('Old Sampler...')
+    gprob = Gibbs_Probit_Sampler()
+    gprob.load_data(data)
+    print('Running sampling...')
+    gprob.run_sampler(5000, burnIn=15000)
+    print('Sampling finished, calculating statistics...')
+
+    acc_u, acc_u_t = gprob.comp_mcmc_stats()
+    print("Accuracy of Gibbs-Probit: acc_u = %f, acc_u_t = %f" % (acc_u, acc_u_t))
+    print()
+    """
+
+    print('New Sampler...')
+    gprob2 = Gibbs_Probit_Sampler2(gamma=0.1)
+    gprob2.load_data(data)
+    print('Running sampling...')
+    gprob2.run_sampler(20000, burnIn=1000)
+    print('Sampling finished, calculating statistics...')
+
+    acc_u, acc_u_t = gprob2.comp_mcmc_stats()
+    print("Accuracy of Gibbs-Probit: acc_u = %f, acc_u_t = %f" % (acc_u, acc_u_t))
+    print()
+
+    if run_ipy:
+        embed()
+
+
+
 
 
 
@@ -155,5 +227,7 @@ if __name__ == "__main__":
     #test2moons(show_plot, run_ipy)
     #testG3_GR(show_plot, run_ipy)
     #testG3_GPS(show_plot, run_ipy)
-    #testMNIST(run_ipy )
-    testGP_GR(run_ipy)
+    #testMNIST(run_ipy)
+    #testGP_GR(run_ipy)
+    #test_pCnProb(run_ipy)
+    test_GProb2(run_ipy)
