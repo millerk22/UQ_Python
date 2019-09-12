@@ -4,9 +4,13 @@ import scipy.linalg as sla
 import matplotlib.pyplot as plt
 from itertools import permutations
 
-def threshold1D(u):
-    u[u >= 0.0] = 1.
-    u[u < 0.0] = -1.
+def threshold1D(u, zero_one=False):
+    if zero_one:
+        u[u >= 0.5] = 1.
+        u[u < 0.5] = 0.
+    else:
+        u[u >= 0.0] = 1.
+        u[u < 0.0] = -1.
     return u
 
 def threshold2D(u, one_hot=True):
