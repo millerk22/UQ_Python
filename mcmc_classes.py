@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from datasets.util import calc_GR_posterior, threshold1D, threshold2D
-from datasets.util import threshold2D_many, threshold2D_avg, threshold1D_avg
+from util.util import calc_GR_posterior, threshold1D, threshold2D
+from util.util import threshold2D_many, threshold2D_avg, threshold1D_avg
 import scipy.sparse as sps
 from scipy.linalg import eigh
 from scipy.stats import norm
