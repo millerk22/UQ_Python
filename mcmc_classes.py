@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from util.util import calc_GR_posterior, threshold1D, threshold2D
-from util.util import threshold2D_many, threshold2D_avg, threshold1D_avg
+from util.util import threshold2D_avg, threshold1D_avg, SummaryStats
 import scipy.sparse as sps
 from scipy.linalg import eigh
 from scipy.stats import norm
@@ -11,7 +11,6 @@ import matlab.engine
 from datasets.trnm import TruncRandNormMulticlass
 
 
-
 class MCMC_Sampler(object):
     def __init__(self, gamma, tau=0., alpha=1.):
         self.gamma2 = gamma**2.
@@ -19,6 +18,8 @@ class MCMC_Sampler(object):
         self.alpha = alpha
         self.stats = None
         self.Data = None
+        self.sum_stats = SummaryStats()
+        self.sum_stats_t = SummaryStats()
 
     def load_data(self, Data, plot_=False):
         self.Data = Data
@@ -38,14 +39,15 @@ class MCMC_Sampler(object):
 
 
     def comp_mcmc_stats(self):
-        print("\tComputing output statistics...")
-        # Confusion matrix, recall, precision, recall_conf, precision_conf, acc
+        print("\tComputing summary statistics...")
+
         if self.Data is None:
-            raise ValueError('Data is not loaded..')
+            raise ValueError('No Data object loaded yet...')
         if self.u_mean is None:
             raise ValueError('Have not sampled yet... need to run sampler to obtain stats.')
 
-        # Calculate accuracy
+        # Get class labelings of computed means, for use in summary stats computation
+        # (this gives a 1D np array with computed class labeling)
         if -1 in self.Data.classes:
             u_mean_t = threshold1D(self.u_mean.copy())
             u_t_mean_t = threshold1D(self.u_t_mean.copy())
@@ -53,18 +55,13 @@ class MCMC_Sampler(object):
             u_mean_t = threshold1D(self.u_mean.copy(), True)
             u_t_mean_t = threshold1D(self.u_t_mean.copy(), True)
         else:
-            u_mean_t = threshold2D(self.u_mean.copy(), False)  # this returns 1D np array with computed class
+            u_mean_t = threshold2D(self.u_mean.copy(), False)
             u_t_mean_t = threshold2D(self.u_t_mean.copy(), False)
 
+        self.sum_stats.compute(self.Data.ground_truth, u_mean_t, self.Data.N, self.Data.num_class)
+        self.sum_stats_t.compute(self.Data.ground_truth, u_t_mean_t, self.Data.N, self.Data.num_class)
 
-        err_u = len(np.where(u_mean_t != self.Data.ground_truth)[0])/self.Data.N
-        err_u_t = len(np.where(u_t_mean_t != self.Data.ground_truth)[0])/self.Data.N
-        self.acc_u = 1. - err_u
-        self.acc_u_t = 1. - err_u_t
-
-
-
-        return self.acc_u, self.acc_u_t
+        return self.sum_stats.acc, self.sum_stats_t.acc
 
 
     def active_learning_choices(self, method, num_to_label):
@@ -108,7 +105,7 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
         represent the empirical probability of being class +1 from the samples.
         """
         MCMC_Sampler.run_sampler(self, num_samples)
-        print("Running Gaussian Regression sampling to get %d samples, with %d burnIn samples" % (num_samples, burnIn))
+        print("Running Gaussian Regression sampling to get %d samples, with no burnIn samples" % num_samples)
         ## run Gaussian Regression method here -- ignoring burnIn
         self.m, self.C, self.y = calc_GR_posterior(self.Data.evecs, self.Data.evals, self.Data.fid,
                                 self.Data.labeled, self.Data.unlabeled, self.tau, self.alpha, self.gamma2)
