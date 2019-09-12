@@ -5,4 +5,7 @@ util_hf.py
 gp_convert.py
 gp_convert_remote.py
 **datasets/GasPlume/
+**datasets/HUJI/
+mat_mnist_test.py
+mnist_data.mat
 

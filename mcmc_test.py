@@ -1,6 +1,6 @@
 from mcmc_classes import *
 from datasets.dataloaders import *
-from datasets.util import *
+from util.util import *
 import numpy as np
 from IPython import embed
 import sys

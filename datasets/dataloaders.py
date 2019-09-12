@@ -2,7 +2,7 @@ import numpy as np
 import scipy.sparse as sps
 import scipy.linalg as sla
 from sklearn.datasets import make_moons, load_digits
-from .util import plot_iter_multi, plot_iter, calc_stats_multi
+import sys
 import os
 import requests
 import pickle
@@ -11,6 +11,9 @@ from zipfile import ZipFile
 import gzip
 import matplotlib.pyplot as plt
 from scipy.io import loadmat
+sys.path.append('../util/')
+from util.util import plot_iter_multi, plot_iter, calc_stats_multi
+
 
 
 """TODO: Need a way to have an "original" fid dictionary, that can then pass to
