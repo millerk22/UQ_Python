@@ -29,7 +29,8 @@ Also, we will be testing "Human-in-the-Loop" active sampling schemes to progress
 The necessary data structures representing the similarity graphs of the desired datasets are contained in ``Data_obj`` classes. For each of the datasets, there are corresponding functions ``load_*`` functions in the file ``datasets\dataloaders.py``. Then, the different MCMC sampling methods are defined by ``MCMC_Sampler`` objects, each kind corresponding to the MCMC method (e.g. ``Gibbs_Probit_Sampler`` object implements the Gibbs-Probit MCMC method). These sampler objects then can load ``Data_obj`` objects, and then run its respective sampling method with the loaded dataset, saving the desired mean points, statistics, etc. This object-oriented approach allows for simple, flexible use of the different datasets and methods.
 
 To run the current test being worked on, run ``python basic_test.py`` in the command line in this current directory, which runs the Gibbs-Probit MCMC Sampler on a datset of 3 Gaussian Clusters. Can also use the following flags in your command line call:
-* ``--show 0`` to __not__ show the plot of data set
 * ``--embed 1`` to run IPython session with the saved variables after the test run
+* ``--show 0`` to __not__ show the plot of data set (only if data is 2-dimensional, currently)
+
 
 
