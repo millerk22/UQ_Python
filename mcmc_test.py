@@ -160,7 +160,7 @@ def test_pCn(run_ipy=False):
         pcnprob.gamma = gamma
         print('gamma = %f' % gamma)
         print('Running sampling...')
-        pcnprob.run_sampler(40000, burnIn=20000)
+        pcnprob.run_sampler(4000, burnIn=2000)
         print('Sampling finished, calculating statistics...')
 
         acc_u, acc_u_t = pcnprob.comp_mcmc_stats()
@@ -183,7 +183,7 @@ def test_GProb2(run_ipy=False):
 
     gprob2 = Gibbs_Probit_Sampler(gamma=0.1)
     gprob2.load_data(data)
-    gprob2.run_sampler(20000, burnIn=10000)
+    gprob2.run_sampler(2000, burnIn=1000)
 
     acc_u, acc_u_t = gprob2.comp_mcmc_stats()
     print("Accuracy of Gibbs-Probit: acc_u = %f, acc_u_t = %f" % (acc_u, acc_u_t))
@@ -198,7 +198,7 @@ def test_HUJI(run_ipy=False):
     data = load_HUJI()
     gprob = Gibbs_Probit_Sampler(gamma=0.1)
     gprob.load_data(data)
-    gprob.run_sampler(2000, burnIn=1000)
+    gprob.run_sampler(1000, burnIn=500)
 
     acc_u, acc_u_t = gprob.comp_mcmc_stats()
     print("Accuracy of Gibbs-Probit: acc_u = %f, acc_u_t = %f" % (acc_u, acc_u_t))
@@ -230,11 +230,10 @@ if __name__ == "__main__":
 
 
 
-    #test2moons(show_plot, run_ipy)
-    #testG3_GR(show_plot, run_ipy)
-    #testG3_GPS(show_plot, run_ipy)
-    #testMNIST(run_ipy)
-    #testGP_GR(run_ipy)
-    #test_pCn(run_ipy)
-    #test_GProb2(run_ipy)
+    test2moons(show_plot, run_ipy)
+    testG3_GR(show_plot, run_ipy)
+    testG3_GPS(show_plot, run_ipy)
+    testMNIST(run_ipy)
+    test_pCn(run_ipy)
+    test_GProb2(run_ipy)
     test_HUJI(run_ipy)

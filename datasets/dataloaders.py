@@ -25,7 +25,7 @@ class Data_obj(object):
         self.evals = evals
         self.evecs = evecs
         self.fid = fid
-        self.ground_truth = ground_truth
+        self.ground_truth = ground_truth.astype(int)
         self.N = self.ground_truth.shape[0]
         self.classes = list(self.fid.keys())
         self.num_class = len(self.classes)

@@ -202,3 +202,51 @@ def calc_GR_posterior(v, w, fid, labeled, unlabeled, tau, alpha, gamma2):
     else:
         m = np.asarray(m)
     return m, np.asarray(C), y
+
+
+
+
+""" Summary Stats object and associated functions """
+
+def summary_stats(K, N, gt, calc):
+    C = np.zeros((K, K), dtype=np.float32)
+    for i in range(N):
+        C[gt[i], calc[i]] += 1.
+    recall_confmat = C / np.sum(C,axis=1)[:,np.newaxis]
+    precision_confmat = C.T /np.sum(C, axis=0)[:,np.newaxis]
+    recall = np.average(np.diagonal(recall_confmat))
+    precision = np.average(np.diagonal(precision_confmat))
+    acc = len(np.where(calc == gt)[0])/N
+    return C, recall_confmat, precision_confmat, recall, precision, acc
+
+def summary_stats_1(N, gt, calc):
+    C = np.zeros((2,2), dtype=np.float32)
+    gt_shift = ((gt + 1)/2).astype(int)
+    calc_shift = ((calc + 1)/2).astype(int)
+    for i in range(N):
+        C[gt_shift[i],calc_shift[i]] += 1.
+    recall_confmat = C / np.sum(C,axis=1)[:,np.newaxis]
+    precision_confmat = C.T /np.sum(C, axis=0)[:,np.newaxis]
+    recall = np.average(np.diagonal(recall_confmat))
+    precision = np.average(np.diagonal(precision_confmat))
+    acc = len(np.where(calc == gt)[0])/N
+    return C, recall_confmat, precision_confmat, recall, precision, acc
+
+
+
+class SummaryStats(object):
+    def __init__(self):
+        self.C = None
+        self.recall_cm = None
+        self.precision_cm = None
+        self.recall = None
+        self.precision = None
+        self.acc = None
+
+    def compute(self, gt, calc, N, K):
+        classes = np.unique(gt)
+        if K == 2 and -1 in classes:
+            sum_stats = summary_stats_1(N, gt, calc)
+        else:
+            sum_stats = summary_stats(K, N, gt, calc)
+        self.C, self.recall_cm, self.precision_cm, self.recall, self.precision, self.acc = sum_stats
