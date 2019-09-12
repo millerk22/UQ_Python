@@ -10,6 +10,7 @@ from io import BytesIO
 from zipfile import ZipFile
 import gzip
 import matplotlib.pyplot as plt
+from scipy.io import loadmat
 
 
 """TODO: Need a way to have an "original" fid dictionary, that can then pass to
@@ -87,12 +88,13 @@ class Data_obj(object):
             plot_iter_multi(stats, self.X, self.fid, k_next=-1)
 
 
-    ### function to reset Data object to orig labeled, fid, unlabeled?
+    ### function to reset Data object to orig labeled, fid, unlabeled for AL?
 
 
 
 
 def load_2_moons(N=2000, noise=0.2, sup_percent=0.05, normed_lap=False, random=False, zero_one=False):
+    print("Loading the 2 moons data with %d total points..." % N)
     # rand_state = None yields a random, new dataset to be made
     if random:
         rand_state = None
@@ -124,6 +126,7 @@ def load_2_moons(N=2000, noise=0.2, sup_percent=0.05, normed_lap=False, random=F
 
 
 def load_gaussian_cluster(Ns, means, covs, sup_percent=0.05, normed_lap=False):
+    print("Loading the Gaussian Cluster data with %d clusters..." % len(means))
     if len(Ns) != len(means):
         raise ValueError('Must have same number of means as clusters in Ns')
     if len(covs) != len(means):
@@ -144,6 +147,7 @@ def load_gaussian_cluster(Ns, means, covs, sup_percent=0.05, normed_lap=False):
     return Data_obj(X, evals, evecs, fid, ground_truth)
 
 def load_MNIST(digits=[1,4,7,9], num_points=4*[500], num_eig=300, Ltype='n', sup_percent=0.05, k_nn=15, seed=10, full=True):
+    print("Loading the MNIST data with digits %s ..." % str(digits))
     if len(digits) != len(num_points):
         raise ValueError('Length of digits and num_points must be the same')
 
@@ -243,17 +247,12 @@ def load_MNIST(digits=[1,4,7,9], num_points=4*[500], num_eig=300, Ltype='n', sup
 
 
 
-"""
-for i in dig_ind:
-    plt.imshow(imgs[i,:].reshape(28,28))
-    plt.title('class = %d' % labels[i])
-    plt.show()
-"""
 
 
 
 
 def load_gas_plume(num_eig=1000, Ltype='n', sup_percent=0.05, k_nn=15, seed=10):
+    print("Loading the GasPlume data...")
     # filepath and filename creation for checking if this data has already been computed before
     filename = "%d_%s_%d.npz" % (num_eig, Ltype, k_nn)
     file_path = "./datasets/GasPlume/"
@@ -289,18 +288,28 @@ def load_gas_plume(num_eig=1000, Ltype='n', sup_percent=0.05, k_nn=15, seed=10):
     else:
         pass
 
-
-
-
-
-
-
     return X, ground_truth
 
 
+FILENAME = 'HUJI_data_tau_-2_K_40_Laplacian_n_Metric_Euclidean_numsample_400_.mat'
 
-def load_HUJI():
-    pass
+def load_HUJI(filepath='./datasets/HUJI/', sup_percent=0.1, seed=10):
+    print("Loading the HUJI data...")
+    huji = loadmat(filepath + FILENAME)
+    evals, evecs, ground_truth, num_tr = huji['E'], huji['phi'], huji['ground_truth'], huji['ratio']
+    num_tr = num_tr[0][0]
+    ground_truth = ground_truth.flatten() - 1
+
+    # Define the fidelity
+    np.random.seed(seed)
+    fid = {}
+    for cl in np.unique(ground_truth):
+        cl_ind = np.where(ground_truth == cl)[0]
+        cl_ind = cl_ind[cl_ind <= num_tr]
+        np.random.shuffle(cl_ind)
+        fid[cl] = cl_ind[:int(sup_percent*len(cl_ind))]
+
+    return Data_obj(None, evals.flatten(), evecs, fid, ground_truth)
 
 
 
