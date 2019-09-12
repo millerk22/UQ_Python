@@ -30,7 +30,7 @@ The necessary data structures representing the similarity graphs of the desired 
 
 To run the current test being worked on, run ``python basic_test.py`` in the command line in this current directory, which runs the Gibbs-Probit MCMC Sampler on a datset of 3 Gaussian Clusters. Can also use the following flags in your command line call:
 * ``--embed 1`` to run IPython session with the saved variables after the test run
-* ``--show 0`` to __not__ show the plot of data set (only if data is 2-dimensional, currently)
+* ``--show 1`` to show plot of data set (only if data is 2-dimensional, currently)
 
 
 
