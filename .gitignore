@@ -8,4 +8,5 @@ gp_convert_remote.py
 **datasets/HUJI/
 mat_mnist_test.py
 mnist_data.mat
-
+**datasets/CITESEER
+.DS_Store

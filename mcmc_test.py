@@ -208,6 +208,8 @@ def test_HUJI(run_ipy=False):
         embed()
 
 
+def test_citeseer(run_ipy):
+    cite = load_CITESEER()
 
 
 
@@ -229,7 +231,7 @@ if __name__ == "__main__":
             run_ipy = int(args.embed)
 
 
-
+    
     test2moons(show_plot, run_ipy)
     testG3_GR(show_plot, run_ipy)
     testG3_GPS(show_plot, run_ipy)
