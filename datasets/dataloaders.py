@@ -314,7 +314,17 @@ def load_HUJI(filepath='./datasets/HUJI/', sup_percent=0.1, seed=10):
 
     return Data_obj(None, evals.flatten(), evecs, fid, ground_truth)
 
+def load_CITESEER(filepath='./datasets/CITESEER/', Ltype='n', num_eig= 500, sup_percent=0.1, seed=1):
+    data = np.load(filepath + 'CITESEER_%d_%s.npz' %(num_eig, Ltype))
+    evals, evecs, ground_truth = data['evals'], data['evecs'], data['ground_truth']
+    np.random.seed(seed)
+    fid = {}
+    for cl in np.unique(ground_truth):
+        cl_ind = np.where(ground_truth == cl)[0]
+        np.random.shuffle(cl_ind)
+        fid[cl] = cl_ind[:int(sup_percent*len(cl_ind))]
 
+    return Data_obj(None, evals, evecs, fid, ground_truth)
 
 
 
