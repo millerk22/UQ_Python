@@ -315,6 +315,7 @@ def load_HUJI(filepath='./datasets/HUJI/', sup_percent=0.1, seed=10):
     return Data_obj(None, evals.flatten(), evecs, fid, ground_truth)
 
 def load_CITESEER(filepath='./datasets/CITESEER/', Ltype='n', num_eig= 500, sup_percent=0.1, seed=1):
+    print("Note that the current code here assumes you already have the file %s/CITESEER_%d_%s.npz already saved." % (filepath, num_eig, Ltype))
     data = np.load(filepath + 'CITESEER_%d_%s.npz' %(num_eig, Ltype))
     evals, evecs, ground_truth = data['evals'], data['evecs'], data['ground_truth']
     np.random.seed(seed)
