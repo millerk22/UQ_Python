@@ -115,6 +115,7 @@ def load_2_moons(N=2000, noise=0.2, sup_percent=0.05, normed_lap=False, random=F
     classes = np.unique(ground_truth)
     indices = np.array(list(range(N)))
     fid = {}
+    #np.random.seed(10)
     for i in classes:
         i_mask = indices[ground_truth ==i]
         np.random.shuffle(i_mask)
