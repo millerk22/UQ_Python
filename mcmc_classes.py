@@ -90,7 +90,7 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
             num_samples : int , number of desired samples from this sampling.
                 (Note for GR here no burnIn needed)
             f : str 'thresh' or function handle, samples will compute values related to
-                E[f(u)]. On
+                E[f(u)].
 
         Outputs:
             Saves to the Sampler object:
@@ -111,7 +111,7 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
                                 self.Data.labeled, self.Data.unlabeled, self.tau, self.alpha, self.gamma2)
 
         # binary class case
-        if self.Data.num_class == 2:
+        if -1 in self.Data.classes:
             samples = np.random.multivariate_normal(self.m, self.C, num_samples).T
             self.u_mean = np.average(samples, axis=1)
             if f == 'thresh':
