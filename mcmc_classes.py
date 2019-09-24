@@ -25,6 +25,7 @@ class MCMC_Sampler(object):
         self.Data = Data
         if not self.Data.have_useful:
             self.Data.get_useful_structs()
+            self.evals_mod = np.power(self.Data.evals + self.tau**2., self.alpha)
         if plot_:
             self.Data.plot_initial()
 
@@ -146,8 +147,6 @@ class Gibbs_Probit_Sampler(MCMC_Sampler):
     def __init__(self, gamma=0.01, tau=0., alpha=1.):
         MCMC_Sampler.__init__(self, gamma, tau, alpha)
         self.gamma = gamma
-        if tau != 0. or alpha != 1.:
-            print('Sampling for tau != 0. and alpha != 1. is not yet implemented, proceeding with default values')
 
     def load_data(self, Data, plot_=False):
         MCMC_Sampler.load_data(self, Data, plot_)
@@ -179,15 +178,17 @@ class Gibbs_Probit_Sampler(MCMC_Sampler):
             u[np.ix_(ind, len(ind)*[c])] = 1.
             fidv[c] = [self.Data.labeled.index(j) for j in ind]
 
+
         # sample Gaussian noise in batch to begin
         z_all = np.random.randn(len(self.Data.evals), self.Data.num_class, num_samples+burnIn)
 
         # Compute the projections for use in the KL expansion for sampling u | v
+
         V_KJ = self.Data.evecs[self.Data.labeled,:]
         P_KJ = V_KJ.T.dot(V_KJ)/self.gamma2
-        for i in range(len(self.Data.evals)):
-            P_KJ[i,i] += self.Data.evals[i]
-        P_KJ = 0.5*(P_KJ + P_KJ.T)  # do we need? seems to be symmetric already...
+        for i in range(len(self.evals_mod)):
+            P_KJ[i,i] += self.evals_mod[i]
+        #P_KJ = 0.5*(P_KJ + P_KJ.T)  # do we need? seems to be symmetric already...
         S_KJ, Q_KJ = eigh(P_KJ)
         inv_skj = 1./np.sqrt(S_KJ)[:,np.newaxis]
 
@@ -256,7 +257,6 @@ class pCN_Probit_Sampler(MCMC_Sampler):
     def run_sampler(self, num_samples, burnIn=0, f='thresh'):
         MCMC_Sampler.run_sampler(self, num_samples, burnIn)
         print("Running pCN Probit sampling to get %d samples, with %d burnIn samples" % (num_samples, burnIn))
-
         norm_rv = norm(scale=self.gamma)  # normal rv for generating the cdf values
 
         # Helper functions for running the MH sampling
@@ -269,14 +269,12 @@ class pCN_Probit_Sampler(MCMC_Sampler):
             return np.min([1., np.exp(log_like(u_) - log_like(w_))])
 
         # Sample Gaussian noise in batch
-
-
         if self.tau > 0:
-            KL_scaled_evecs =  self.Data.evecs * self.Data.evals**-0.5
-            z = np.random.randn(self.Data.evals.shape[0], num_samples+burnIn)
+            KL_scaled_evecs =  self.Data.evecs * self.evals_mod**-0.5
+            z = np.random.randn(self.evals_mod.shape[0], num_samples+burnIn)
         else:
-            KL_scaled_evecs =  self.Data.evecs[:,1:] * self.Data.evals[1:]**-0.5
-            z = np.random.randn(self.Data.evals.shape[0]-1, num_samples+burnIn)
+            KL_scaled_evecs =  self.Data.evecs[:,1:] * self.evals_mod[1:]**-0.5
+            z = np.random.randn(self.evals_mod.shape[0]-1, num_samples+burnIn)
 
         # instantiate sample
         u = np.ones(self.Data.N, dtype=np.float32)*np.average(list(self.Data.fid.keys()))
@@ -348,11 +346,11 @@ class pCN_BLS_Sampler(MCMC_Sampler):
 
         # Sample Gaussian noise in batch
         if self.tau > 0:
-            KL_scaled_evecs =  self.Data.evecs * self.Data.evals**-0.5
-            z = np.random.randn(self.Data.evals.shape[0], num_samples+burnIn)
+            KL_scaled_evecs =  self.Data.evecs * self.evals_mod**-0.5
+            z = np.random.randn(self.evals_mod.shape[0], num_samples+burnIn)
         else:
-            KL_scaled_evecs =  self.Data.evecs[:,1:] * self.Data.evals[1:]**-0.5
-            z = np.random.randn(self.Data.evals.shape[0]-1, num_samples+burnIn)
+            KL_scaled_evecs =  self.Data.evecs[:,1:] * self.evals_mod[1:]**-0.5
+            z = np.random.randn(self.evals_mod.shape[0]-1, num_samples+burnIn)
 
         # instantiate sample
         u = np.ones(self.Data.N, dtype=np.float32)*np.average(list(self.Data.fid.keys()))
@@ -432,13 +430,13 @@ class Gibbs_Probit_Sampler_MATLAB(MCMC_Sampler):
             fidv[c] = [self.Data.labeled.index(j) for j in ind]
 
         # sample Gaussian noise in batch to begin
-        z_all = np.random.randn(len(self.Data.evals), self.Data.num_class, num_samples+burnIn)
+        z_all = np.random.randn(len(self.evals_mod), self.Data.num_class, num_samples+burnIn)
 
         # Compute the projections for use in the KL expansion for sampling u | v
         V_KJ = self.Data.evecs[self.Data.labeled,:]
         P_KJ = (1./self.gamma2)*V_KJ.T.dot(V_KJ)
-        for i in range(len(self.Data.evals)):
-            P_KJ[i,i] += self.Data.evals[i]
+        for i in range(len(self.evals_mod)):
+            P_KJ[i,i] += self.evals_mod[i]
         #P_KJ = 0.5*(P_KJ + P_KJ.T)  # do we need? seems to be symmetric already...
         S_KJ, Q_KJ = eigh(P_KJ)
         inv_skj = 1./np.sqrt(S_KJ)[:,np.newaxis]
