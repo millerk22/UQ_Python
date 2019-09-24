@@ -187,7 +187,7 @@ class Gibbs_Probit_Sampler(MCMC_Sampler):
         P_KJ = V_KJ.T.dot(V_KJ)/self.gamma2
         for i in range(len(self.Data.evals)):
             P_KJ[i,i] += self.Data.evals[i]
-        #P_KJ = 0.5*(P_KJ + P_KJ.T)  # do we need? seems to be symmetric already...
+        P_KJ = 0.5*(P_KJ + P_KJ.T)  # do we need? seems to be symmetric already...
         S_KJ, Q_KJ = eigh(P_KJ)
         inv_skj = 1./np.sqrt(S_KJ)[:,np.newaxis]
 
