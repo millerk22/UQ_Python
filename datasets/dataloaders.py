@@ -39,7 +39,7 @@ class Data_obj(object):
 
         indices = np.array(list(range(self.N)))  # 0, 1, 2, ... for use in other calculations
         self.labeled = set()        # labeled nodes list
-        self.gt_flipped = {}      # ground_truth "flipped" k,v pairs -> i : class(i)
+        self.gt_flipped = {}      # ground_truth "flipped" k,v pairs -> i : class(i). don't need??
         for i in self.classes:
             i_mask = indices[self.ground_truth == i]
             self.gt_flipped[i] = i_mask
