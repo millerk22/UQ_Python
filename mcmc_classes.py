@@ -13,6 +13,7 @@ from datasets.trnm import TruncRandNormMulticlass
 
 class MCMC_Sampler(object):
     def __init__(self, gamma, tau=0., alpha=1.):
+        self.gamma = gamma
         self.gamma2 = gamma**2.
         self.tau = tau
         self.alpha = alpha
@@ -20,6 +21,7 @@ class MCMC_Sampler(object):
         self.Data = None
         self.sum_stats = SummaryStats()
         self.sum_stats_t = SummaryStats()
+        self.name = "MCMC"
 
     def load_data(self, Data, plot_=False):
         self.Data = Data
@@ -76,6 +78,9 @@ class MCMC_Sampler(object):
         plt.title('Plot of u')
         plt.show()
 
+    def __str__(self):
+        return "%s(gamma=%1.3f, tau=%1.3f, alpha=%1.3f)" % (self.name, self.gamma, self.tau, self.alpha)
+
 
 
 
@@ -84,8 +89,9 @@ class MCMC_Sampler(object):
 
 
 class Gaussian_Regression_Sampler(MCMC_Sampler):
-    def __init__(self, gamma=0.001, tau=0.01, alpha=1.0):
+    def __init__(self, gamma=0.01, tau=0.01, alpha=1.0):
         MCMC_Sampler.__init__(self, gamma, tau, alpha)
+        self.name = "Gaussian_Regression"
 
     def load_data(self, Data, plot_=False):
         MCMC_Sampler.load_data(self, Data, plot_)
@@ -153,7 +159,7 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
 class Gibbs_Probit_Sampler(MCMC_Sampler):
     def __init__(self, gamma=0.01, tau=0., alpha=1.):
         MCMC_Sampler.__init__(self, gamma, tau, alpha)
-        self.gamma = gamma
+        self.name = "Gaussian_Probit"
 
     def load_data(self, Data, plot_=False):
         MCMC_Sampler.load_data(self, Data, plot_)
@@ -247,7 +253,7 @@ class Gibbs_Probit_Sampler(MCMC_Sampler):
 class pCN_Probit_Sampler(MCMC_Sampler):
     def __init__(self, beta, gamma=0.1, tau=0., alpha=1.):
         MCMC_Sampler.__init__(self, gamma, tau, alpha)
-        self.gamma = gamma
+        self.name = "pCN_Probit"
         self.beta = beta
 
     def load_data(self, Data, plot_=False):
@@ -262,7 +268,7 @@ class pCN_Probit_Sampler(MCMC_Sampler):
         self.y[mask] = ofs
 
 
-    def run_sampler(self, num_samples, burnIn=0, f='thresh'):
+    def run_sampler(self, num_samples, burnIn=0, f='thresh', seed=None):
         MCMC_Sampler.run_sampler(self, num_samples, burnIn)
         print("Running pCN Probit sampling to get %d samples, with %d burnIn samples" % (num_samples, burnIn))
         norm_rv = norm(scale=self.gamma)  # normal rv for generating the cdf values
@@ -277,6 +283,7 @@ class pCN_Probit_Sampler(MCMC_Sampler):
             return np.min([1., np.exp(log_like(u_) - log_like(w_))])
 
         # Sample Gaussian noise in batch
+        np.random.seed(seed)
         if self.tau > 0:
             KL_scaled_evecs =  self.Data.evecs * self.evals_mod**-0.5
             z = np.random.randn(self.evals_mod.shape[0], num_samples+burnIn)
@@ -323,7 +330,7 @@ class pCN_Probit_Sampler(MCMC_Sampler):
 class pCN_BLS_Sampler(MCMC_Sampler):
     def __init__(self, beta, gamma=0.1, tau=0., alpha=1.):
         MCMC_Sampler.__init__(self, gamma, tau, alpha)
-        self.gamma = gamma
+        self.name = "pCN_BLS"
         self.beta = beta
 
     def load_data(self, Data, plot_=False):
@@ -338,7 +345,7 @@ class pCN_BLS_Sampler(MCMC_Sampler):
             self.zero_one = True
         print("classes contains 0 is %s" % str(self.zero_one))
 
-    def run_sampler(self, num_samples, burnIn=0, f='thresh'):
+    def run_sampler(self, num_samples, burnIn=0, f='thresh', seed=None):
         MCMC_Sampler.run_sampler(self, num_samples, burnIn)
         print("Running pCN BLS sampling to get %d samples, with %d burnIn samples" % (num_samples, burnIn))
 
@@ -353,6 +360,7 @@ class pCN_BLS_Sampler(MCMC_Sampler):
             return np.min([1., np.exp(log_like(u_) - log_like(w_))])
 
         # Sample Gaussian noise in batch
+        np.random.seed(seed)
         if self.tau > 0:
             KL_scaled_evecs =  self.Data.evecs * self.evals_mod**-0.5
             z = np.random.randn(self.evals_mod.shape[0], num_samples+burnIn)
