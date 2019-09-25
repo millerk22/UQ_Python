@@ -115,7 +115,8 @@ def load_2_moons(N=2000, noise=0.2, sup_percent=0.05, normed_lap=False, random=F
     classes = np.unique(ground_truth)
     indices = np.array(list(range(N)))
     fid = {}
-    #np.random.seed(10)
+    if not random:
+        np.random.seed(10)
     for i in classes:
         i_mask = indices[ground_truth ==i]
         np.random.shuffle(i_mask)
@@ -129,7 +130,7 @@ def load_2_moons(N=2000, noise=0.2, sup_percent=0.05, normed_lap=False, random=F
     return Data_obj(X, evals, evecs, fid, ground_truth)
 
 
-def load_gaussian_cluster(Ns, means, covs, sup_percent=0.05, normed_lap=False):
+def load_gaussian_cluster(Ns, means, covs, sup_percent=0.05, normed_lap=False, random=False):
     print("Loading the Gaussian Cluster data with %d clusters..." % len(means))
     if len(Ns) != len(means):
         raise ValueError('Must have same number of means as clusters in Ns')
@@ -142,6 +143,8 @@ def load_gaussian_cluster(Ns, means, covs, sup_percent=0.05, normed_lap=False):
 
     indices = np.array(list(range(N)))
     fid = {}
+    if not random:
+        np.random.seed(10)
     for i in classes:
         i_mask = indices[ground_truth ==i]
         np.random.shuffle(i_mask)
@@ -200,7 +203,7 @@ def load_MNIST(digits=[1,4,7,9], num_points=4*[500], num_eig=300, Ltype='n', sup
         labels = np.frombuffer(buf, dtype=np.uint8)
 
         """ Processing to get the desired subset of digits"""
-        np.random.seed(seed+1)
+        np.random.seed(seed)
         dig_ind = []
         for j in range(len(digits)):
             d_ind = np.where(labels == digits[j])[0]
@@ -247,6 +250,8 @@ def load_MNIST(digits=[1,4,7,9], num_points=4*[500], num_eig=300, Ltype='n', sup
         # NOT SAVING fid, since will allow for different runs on fidelity
         np.savez(file_path + filename, X=X, evals=evals, evecs=evecs, ground_truth=ground_truth)
 
+    # Reset the seed for random choices to be random, so as to allow for different runs
+    np.random.seed(None)
     return Data_obj(X, evals, evecs, fid, ground_truth)
 
 
@@ -363,7 +368,7 @@ def make_sim_graph(X, k_nn=5):
 
 
 # Gaussian clusters data
-def generate_data_graphs(Ns, means, Covs, k_nn=5):
+def generate_data_graphs(Ns, means, Covs, k_nn=5, random=False):
     '''
     inputs   :
       Ns    : class sizes, an array of length K
@@ -376,6 +381,8 @@ def generate_data_graphs(Ns, means, Covs, k_nn=5):
     X = np.zeros((N, d))
     ground_truth = np.zeros(N)
     offset = 0
+    if not random:
+        np.random.seed(10)
     for i in range(len(Ns)):
         Ni = Ns[i]
         X[offset:offset+Ni,:] = np.random.multivariate_normal(means[i], Covs[i], Ni)

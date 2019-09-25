@@ -23,11 +23,12 @@ class MCMC_Sampler(object):
 
     def load_data(self, Data, plot_=False):
         self.Data = Data
+        self.evals_mod = np.power(self.Data.evals + self.tau**2., self.alpha)
         if not self.Data.have_useful:
             self.Data.get_useful_structs()
-            self.evals_mod = np.power(self.Data.evals + self.tau**2., self.alpha)
         if plot_:
             self.Data.plot_initial()
+
 
     def run_sampler(self, num_samples, burnIn=0):
         if self.Data is None:
@@ -74,6 +75,12 @@ class MCMC_Sampler(object):
         plt.scatter(self.Data.labeled, u[self.Data.labeled], c='g')
         plt.title('Plot of u')
         plt.show()
+
+
+
+
+
+
 
 
 class Gaussian_Regression_Sampler(MCMC_Sampler):
@@ -161,7 +168,7 @@ class Gibbs_Probit_Sampler(MCMC_Sampler):
         self.TRNM = TruncRandNormMulticlass(self.Data.num_class)
 
 
-    def run_sampler(self, num_samples, burnIn=0, f='thresh'):
+    def run_sampler(self, num_samples, burnIn=0, f='thresh', seed=None):
         MCMC_Sampler.run_sampler(self, num_samples, burnIn)
         print("Running Gibbs-Probit sampling to get %d samples, with %d burnIn samples" % (num_samples, burnIn))
 
@@ -180,6 +187,7 @@ class Gibbs_Probit_Sampler(MCMC_Sampler):
 
 
         # sample Gaussian noise in batch to begin
+        np.random.seed(seed)
         z_all = np.random.randn(len(self.Data.evals), self.Data.num_class, num_samples+burnIn)
 
         # Compute the projections for use in the KL expansion for sampling u | v
@@ -203,9 +211,9 @@ class Gibbs_Probit_Sampler(MCMC_Sampler):
             # Sample v ~ P(v | u). Uses the MATLAB function for trandn_multiclass MATLAB object
             v = np.zeros((len(self.Data.labeled), self.Data.num_class))
 
+
             for cl, ind_cl in self.Data.fid.items():
                 v[fidv[cl],:] = self.TRNM.gen_samples(u[ind_cl,:], self.gamma, cl)
-
 
 
             # Sample u ~ P(u | v) via KL expansion

@@ -116,7 +116,7 @@ def trnd(l,u):
         d = len(I) # number of rejected
     return x
 
-def trandn(l, u):
+def trandn(l, u, seed=None):
     """ Efficient generator of a vector of length = len(l) = len(u)
     from the standard multivariate normal distribution, truncated over the
     region [l,u]. (infinite values for 'u' and 'l' are accepted)
