@@ -1,6 +1,6 @@
 from mcmc_classes import *
 from datasets.dataloaders import *
-from datasets.util import *
+from util.util import *
 import numpy as np
 from IPython import embed
 import sys
@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
 
 
-    tprint("Running Gaussian Cluster test of MCMC sampler, Gibbs Probit")
+    print("\nRunning Gaussian Cluster test of MCMC sampler, Gibbs Probit")
     # load Gaussian Clusters data, plot initial distribution of labeled and unlabeled
     Ns = [100,200,100]
     mus = [np.array([1., 0.]), np.array([-1., 0.]), np.array([0., 1.5])]
@@ -35,14 +35,16 @@ if __name__ == "__main__":
     if show_plot:
         data.plot_initial()
 
-    # Create the GR sampler, default params : gamma = 0.001, tau = 0.01, alpha = 1.0
+    # Create the Gibbs-Probit sampler, default params : gamma = 0.01, tau = 0.01, alpha = 1.0
     GPS = Gibbs_Probit_Sampler()
     GPS.load_data(data)
-
-    # Get 100 samples (i.e. calculate the posterior mean and covariance, then sample)
+    # Get 1000 samples (i.e. calculate the posterior mean and covariance, then sample)
+    num_samples = 1000
     tic = time.process_time()
-    GPS.run_sampler(1000)
-    print('Sampling took %f seconds ' % (time.process_time() - tic))
+    GPS.run_sampler(num_samples)
+    print('%s :\n\tSampling of %d samples took %f seconds ' % (str(GPS), num_samples, time.process_time() - tic))
+    gps_acc_u, gps_acc_u_t = GPS.comp_mcmc_stats()
+    print("\tAccuracy of u_mean: %f" % gps_acc_u)
 
     # embed the current namespace in an iPython session in the terminal
     if run_ipy:
