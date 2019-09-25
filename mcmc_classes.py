@@ -43,7 +43,7 @@ class MCMC_Sampler(object):
 
 
     def comp_mcmc_stats(self):
-        print("\tComputing summary statistics...")
+        print("Computing summary statistics...")
 
         if self.Data is None:
             raise ValueError('No Data object loaded yet...')
@@ -157,7 +157,7 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
 
 
 class Gibbs_Probit_Sampler(MCMC_Sampler):
-    def __init__(self, gamma=0.01, tau=0., alpha=1.):
+    def __init__(self, gamma=0.01, tau=0.01, alpha=1.):
         MCMC_Sampler.__init__(self, gamma, tau, alpha)
         self.name = "Gaussian_Probit"
 
@@ -170,7 +170,6 @@ class Gibbs_Probit_Sampler(MCMC_Sampler):
             self.Data.ground_truth[self.Data.ground_truth == -1] = 0.
             self.Data.classes = [0,1]
         # initiate the trandn_multiclass object
-        print("Gibbs Probit Sampler using Python functions.")
         self.TRNM = TruncRandNormMulticlass(self.Data.num_class)
 
 

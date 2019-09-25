@@ -1,4 +1,4 @@
-generate_gauss_clus_graphsimport numpy as np
+import numpy as np
 import scipy.sparse as sps
 import scipy.linalg as sla
 from sklearn.datasets import make_moons, load_digits
