@@ -10,3 +10,5 @@ mat_mnist_test.py
 mnist_data.mat
 **datasets/CITESEER
 .DS_Store
+**LaplacianEvals/
+
