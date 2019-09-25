@@ -43,8 +43,8 @@ if __name__ == "__main__":
     tic = time.process_time()
     GPS.run_sampler(num_samples)
     print('%s :\n\tSampling of %d samples took %f seconds ' % (str(GPS), num_samples, time.process_time() - tic))
-    gps_acc_u, gps_acc_u_t = GPS.comp_mcmc_stats()
-    print("\tAccuracy of u_mean: %f" % gps_acc_u)
+    GPS.comp_mcmc_stats(return_acc=False)
+    print("\tAccuracy of u_mean: %f" % GPS.sum_stats.acc)
 
     # embed the current namespace in an iPython session in the terminal
     if run_ipy:

@@ -42,7 +42,7 @@ class MCMC_Sampler(object):
             self.print_ = True
 
 
-    def comp_mcmc_stats(self):
+    def comp_mcmc_stats(self, return_acc=True):
         print("Computing summary statistics...")
 
         if self.Data is None:
@@ -65,14 +65,21 @@ class MCMC_Sampler(object):
         self.sum_stats.compute(self.Data.ground_truth, u_mean_t, self.Data.N, self.Data.num_class)
         self.sum_stats_t.compute(self.Data.ground_truth, u_t_mean_t, self.Data.N, self.Data.num_class)
 
-        return self.sum_stats.acc, self.sum_stats_t.acc
+
+        """ Should we return accuracy always? """
+        if return_acc:
+            return self.sum_stats.acc, self.sum_stats_t.acc
+        return
 
 
     def active_learning_choices(self, method, num_to_label):
         pass
 
     def plot_u(self, u):
-        #assert len(self.Data.classes) == 2
+        """ Note this plotting assumes that the input u is 1D numpy array. So,
+        if our problem is multiclass, you must be passing only one column to this
+        plotting function.
+        """
         plt.scatter(np.arange(self.Data.N), u)
         plt.scatter(self.Data.labeled, u[self.Data.labeled], c='g')
         plt.title('Plot of u')
