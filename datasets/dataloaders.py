@@ -32,6 +32,7 @@ class Data_obj(object):
         self.have_useful = False
         #self.get_useful_structs()  # maybe call this function right away instead of waiting?
 
+
     def get_useful_structs(self):
         self.org_indices = []  # org_indices organizes indices of nodes according to ground truth class assignments
         for i in self.classes:
@@ -96,16 +97,12 @@ class Data_obj(object):
 
 
 
-def load_2_moons(N=2000, noise=0.2, sup_percent=0.05, normed_lap=False, random=False, zero_one=False):
+def load_2_moons(N=2000, noise=0.2, sup_percent=0.05, normed_lap=False, seed=None, zero_one=False):
     print("Loading the 2 moons data with %d total points..." % N)
     # rand_state = None yields a random, new dataset to be made
-    if random:
-        rand_state = None
-    else:
-        rand_state = 10
 
     # call the sklearn function for making moons data
-    X, ground_truth = make_moons(n_samples=N, noise=noise, random_state=rand_state)
+    X, ground_truth = make_moons(n_samples=N, noise=noise, random_state=seed)
 
     # if want +1, -1 classes, change the corresponding entries
     if not zero_one:
@@ -115,8 +112,7 @@ def load_2_moons(N=2000, noise=0.2, sup_percent=0.05, normed_lap=False, random=F
     classes = np.unique(ground_truth)
     indices = np.array(list(range(N)))
     fid = {}
-    if not random:
-        np.random.seed(10)
+    np.random.seed(seed)
     for i in classes:
         i_mask = indices[ground_truth ==i]
         np.random.shuffle(i_mask)
