@@ -234,11 +234,17 @@ def test_GProb2(run_ipy=False):
 
     gprob = Gibbs_Probit_Sampler(gamma=0.1, tau=0.1, alpha=1.5)
     gprob.load_data(data)
-    gprob.run_sampler(2000, burnIn=1000)
-
-    print(np.allclose(gprob.Data.evals, gprob.evals_mod))
+    gprob.run_sampler(2000, burnIn=1000, seed=10)
 
     acc_u, acc_u_t = gprob.comp_mcmc_stats()
+    print("Accuracy of Gibbs-Probit: acc_u = %f, acc_u_t = %f" % (acc_u, acc_u_t))
+    print()
+
+    gprob2 = Gibbs_Probit_Sampler(gamma=0.1, tau=0.1, alpha=1.5)
+    gprob2.load_data(data)
+    gprob2.run_sampler(2000, burnIn=1000, seed=10)
+
+    acc_u, acc_u_t = gprob2.comp_mcmc_stats()
     print("Accuracy of Gibbs-Probit: acc_u = %f, acc_u_t = %f" % (acc_u, acc_u_t))
     print()
 
@@ -291,6 +297,13 @@ if __name__ == "__main__":
     #testG3_GPS(show_plot, run_ipy)
     #testMNIST(run_ipy)
     #test_pCn(run_ipy)
-    test_pCn2(run_ipy)
-    #test_GProb2(run_ipy)
+    #test_pCn2(run_ipy)
+    test_GProb2(run_ipy)
     #test_HUJI(run_ipy)
+    """
+    data1 = load_MNIST(seed=11)
+    data1.get_useful_structs()
+    data2 = load_MNIST(seed=11)
+    data2.get_useful_structs()
+    print(np.allclose(data1.evals, data2.evals))
+    """
