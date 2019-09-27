@@ -12,6 +12,28 @@ from datasets.trnm import TruncRandNormMulticlass
 
 
 class MCMC_Sampler(object):
+    """ Base MCMC Sampler object. The different classes that inherit from this base
+    class are: Gaussian_Regression_Sampler, Gibbs_Probit_Sampler, pCN_Probit_Sampler,
+    and pCN_BLS_Sampler. Each model has posterior distribution that is proportional
+    to:
+        P(u | y) ~ exp(-1/2 (<u, (L + tau^2)^alpha u> + Phi(u; y, gamma)))
+
+        where Phi(u; y) depend on the noise model we choose (i.e. the different
+        sampler classes).
+
+    MCMC_Sampler basics (see individual member functions for use of functions)
+        - MCMC_Samplers are instantiated with model parameters
+    gamma (noise param), tau (Laplacian shift), alpha (Laplacian power exponent).
+        - load_data() : MCMC_Sampler objects "load in" data objects (Data_obj class), that contain the
+    spectral properties of the respective data set we will be using to run our sampling
+    on.
+        - run_sampler(): According to the sampler type, obtain MCMC samples, keeping
+        track of the mean of the samples. Also keep track of the mean of a function of
+        the samples (default is thresholding/sign function)
+        - comp_mcmc_stats() : after sampling has been done, calculates useful statistics
+        of the sampling run, stored in a SummaryStats object.
+        - active_learning_choices() : NOT IMPLEMENTED YET.
+    """
     def __init__(self, gamma, tau=0., alpha=1.):
         self.gamma = gamma
         self.gamma2 = gamma**2.
@@ -96,6 +118,25 @@ class MCMC_Sampler(object):
 
 
 class Gaussian_Regression_Sampler(MCMC_Sampler):
+    """
+    Gaussian Regression model:
+        Phi(u; y, gamma) = 1/gamma^2 * ||Hu - y||^2
+            - H : Z -> Z'. projection onto labeled nodes
+            - norm is 2 norm for binary classification, and Frobenius for multiclass
+
+        In this case the prior and posterior are conjugate, since all are Gaussian.
+        Have closed form solution for the posterior mean, m, and covariance, C.
+
+        m = 1/gamma^2 C H^T y, C = ((L + tau^2I)^alpha + 1/gamma^2 B)^(-1)
+            - (B = H^T H)
+
+        Though closed for solution for mean is available, still do sampling to see how mean of
+        thresholded samples computes.
+
+
+        Note that the mean and mode (corresponding to the MAP estimator) align for this
+        posterior.
+    """
     def __init__(self, gamma=0.01, tau=0.01, alpha=1.0):
         MCMC_Sampler.__init__(self, gamma, tau, alpha)
         self.name = "Gaussian_Regression"
@@ -164,6 +205,16 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
 
 
 class Gibbs_Probit_Sampler(MCMC_Sampler):
+    """
+    Probit Likelihood model:
+    Phi(u; y, gamma) = - log(Psi(u_j(1) y_j(1); gamma)) - log(Psi(u_j(1) y_j(1); gamma))
+                        ... -log(Psi(u_j(N') y_j(N'); gamma))
+        where Psi(v; gamma) is CDF of normal distribution with standard deviation gamma
+        and j(i) is the ith labeled node.
+
+    Gibbs sampling iterates between sampling from truncated normal distributions
+    on the labeled set, and Karhuenen-Loeve expansion for sampling based on the prior.
+    """
     def __init__(self, gamma=0.01, tau=0.01, alpha=1.):
         MCMC_Sampler.__init__(self, gamma, tau, alpha)
         self.name = "Gaussian_Probit"
@@ -220,10 +271,8 @@ class Gibbs_Probit_Sampler(MCMC_Sampler):
                 print('\tIteration %d of sampling...' % k)
             z_k = z_all[:,:,k] # the white noise samples for use in sampling u | v
 
-            # Sample v ~ P(v | u). Uses the MATLAB function for trandn_multiclass MATLAB object
+            # Sample v ~ P(v | u).
             v = np.zeros((len(self.Data.labeled), self.Data.num_class))
-
-
             for cl, ind_cl in self.Data.fid.items():
                 v[fidv[cl],:] = self.TRNM.gen_samples(u[ind_cl,:], self.gamma, cl)
 
@@ -257,6 +306,21 @@ class Gibbs_Probit_Sampler(MCMC_Sampler):
 
 
 class pCN_Probit_Sampler(MCMC_Sampler):
+    """
+    Probit Likelihood model:
+        Phi(u; y, gamma) = - log(Psi(u_j(1) y_j(1); gamma)) - log(Psi(u_j(1) y_j(1); gamma))
+                        ... -log(Psi(u_j(N') y_j(N'); gamma))
+            where Psi(v; gamma) is CDF of normal distribution with standard deviation gamma
+            and j(i) is the ith labeled node.
+
+    pCN (pre-conditioned Crank Nicholson) is MH-inspired sampler that produces proposal
+    steps by:
+        w^k = sqrt(1 - beta^2)w^k + beta z^k,   z^k ~ N(0, L^(-1))
+    with acceptance probability:
+        a(v,w) = min( 1 , Phi(v; y, gamma) - Phi(w; y, gamma) )
+
+    **** NOTE this is currently only written for Binary classification! ****
+    """
     def __init__(self, beta, gamma=0.1, tau=0., alpha=1.):
         MCMC_Sampler.__init__(self, gamma, tau, alpha)
         self.name = "pCN_Probit"
@@ -334,6 +398,19 @@ class pCN_Probit_Sampler(MCMC_Sampler):
 
 
 class pCN_BLS_Sampler(MCMC_Sampler):
+    """
+    Bayesian Level-Set (BLS) Likelihood model:
+
+        Phi(u; y, gamma) = 1/gamma^2 ||y_j - S(u_j)||^2, where S(v) = sgn(v).
+
+    pCN (pre-conditioned Crank Nicholson) is MH-inspired sampler that produces proposal
+    steps by:
+        w^k = sqrt(1 - beta^2)w^k + beta z^k,   z^k ~ N(0, L^(-1))
+    with acceptance probability:
+        a(v,w) = min( 1 , Phi(v; y, gamma) - Phi(w; y, gamma) )
+
+    **** NOTE this is currently only written for Binary classification! ****
+    """
     def __init__(self, beta, gamma=0.1, tau=0., alpha=1.):
         MCMC_Sampler.__init__(self, gamma, tau, alpha)
         self.name = "pCN_BLS"

@@ -3,7 +3,7 @@
 Code for Uncertainty Quantification sampling, certain functions ported over from legacy MATLAB code. For use in testing the performance differences between the following methods on the datasets:
 
 <center>
-  
+
 | Dataset  | MCMC Method |
 |----------|-------------|
 | 2 Moons |   Gaussian Regression    |
@@ -15,7 +15,10 @@ Code for Uncertainty Quantification sampling, certain functions ported over from
 </center>
 
 ## Uncertainty Quantification in Graph Based Semi-Supervised Learning
-We approach the problem of semi-supervised learning for classification with a graph based approach for Bayesian inverse problems, in which we define a function on the nodes of a similarity graph representing the dataset and use that function to model the labeling of the underlying datapoints. Solving this inverse problem then reduces to minimizing a functional with respect to this node function, giving us a point estimate. Many machine learning algorithms likewise seek to find point estimates of corresponding posterior distributions for their respectively defined model.
+We approach the problem of semi-supervised learning for classification with a graph based approach for Bayesian inverse problems, in which we define a function on the nodes of a similarity graph representing the dataset and use that function to model the labeling of the underlying datapoints. Solving this inverse problem then reduces to minimizing a functional with respect to this node function, giving us a point estimate. Many machine learning algorithms likewise seek to find point estimates of corresponding posterior distributions for their respectively defined model. All models considered in this code base have posterior distributions that can be written in the form:
+
+- <img src="https://latex.codecogs.com/gif.latex? P(u | y) \propto \exp\left(-\frac{1}{2} \left[\langle u, (L + \tau^2 I)^\alpha u\rangle + \Phi(u; y, \gamma) \right]  \right). " />
+
 
 We further seek to quantify our confidence or certainty in the our outputs. Appealing to the Bayesian nature of the models involved, we use samples from the posterior distributions corresponding to the respective models to characterize the uncertainty of our outputs. In this way, we obtain more than just a point estimate of the posterior distribution. These samples allow us to give not only predictions about the classification of unlabeled nodes, but also have some idea of confidence about such predictions.
 
@@ -31,6 +34,3 @@ The necessary data structures representing the similarity graphs of the desired 
 To run the current test being worked on, run ``python basic_test.py`` in the command line in this current directory, which runs the Gibbs-Probit MCMC Sampler on a datset of 3 Gaussian Clusters. Can also use the following flags in your command line call:
 * ``--embed 1`` to run IPython session with the saved variables after the test run
 * ``--show 1`` to show plot of data set (only if data is 2-dimensional, currently)
-
-
-

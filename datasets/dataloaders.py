@@ -16,7 +16,7 @@ from util.util import plot_iter_multi, plot_iter, calc_stats_multi
 
 
 
-"""TODO: Need a way to have an "original" fid dictionary, that can then pass to
+"""TODO for Active Learning: Need a way to have an "original" fid dictionary, that can then pass to
  different runs of Active Learning with UQ samples. Or just have function to
  undo all of the added fidelity points."""
 class Data_obj(object):
@@ -97,10 +97,8 @@ class Data_obj(object):
 
 
 
-def load_2_moons(N=2000, noise=0.2, sup_percent=0.05, normed_lap=False, seed=None, zero_one=False):
+def load_2_moons(N=2000, noise=0.2, sup_percent=0.05, normed_lap=False, num_eig=None, seed=None, zero_one=False):
     print("Loading the 2 moons data with %d total points..." % N)
-    # rand_state = None yields a random, new dataset to be made
-
     # call the sklearn function for making moons data
     X, ground_truth = make_moons(n_samples=N, noise=noise, random_state=seed)
 
@@ -121,7 +119,7 @@ def load_2_moons(N=2000, noise=0.2, sup_percent=0.05, normed_lap=False, seed=Non
 
     # Graph Generation and Eigen-Calculation
     W = make_sim_graph(X)
-    evals, evecs = get_eig_Lnorm(W, normed_=normed_lap)
+    evals, evecs = get_eig_Lnorm(W, num_eig=num_eig, normed_=normed_lap)
 
     return Data_obj(X, evals, evecs, fid, ground_truth)
 
@@ -313,7 +311,9 @@ def load_HUJI(filepath='./datasets/HUJI/', sup_percent=0.1, seed=10):
 
     return Data_obj(None, evals.flatten(), evecs, fid, ground_truth)
 
-def load_CITESEER(filepath='./datasets/CITESEER/', Ltype='n', num_eig= 500, sup_percent=0.1, seed=1):
+def load_CITESEER(filepath='./datasets/CITESEER/', Ltype='n', num_eig=None, sup_percent=0.1, seed=1):
+    if num_eig is None:
+        num_eig = 2110
     print("Note that the current code here assumes you already have the file %s/CITESEER_%d_%s.npz already saved." % (filepath, num_eig, Ltype))
     data = np.load(filepath + 'CITESEER_%d_%s.npz' %(num_eig, Ltype))
     evals, evecs, ground_truth = data['evals'], data['evecs'], data['ground_truth']
@@ -387,12 +387,17 @@ def generate_gauss_clus_graphs(Ns, means, Covs, k_nn=5, seed=None):
     return X, W, ground_truth
 
 
-def get_eig_Lnorm(W, num_eig=300, normed_=True, return_L=False):
+def get_eig_Lnorm(W, num_eig=None, normed_=True, return_L=False):
+    # If num_eig is None, we will calculate all eigenvalues
+    if num_eig is None:
+        num_eig = W.shape[0]
     print('Creating Laplacian')
-    L_sym = sps.csgraph.laplacian(W, normed=normed_)
+    L = sps.csgraph.laplacian(W, normed=normed_)
     print('Finished making Laplacian, now calculating the eval/evecs')
-    #[w, v] = sla.eigh(L_sym.toarray(), eigvals=(0,num_eig-1))
-    w, v = sps.linalg.eigsh(L_sym, k=num_eig, which='SM')
+    if num_eig > int(W.shape[0]/2):
+        w, v = sla.eigh(L.toarray(), eigvals=(0,num_eig-1))
+    else:
+        w, v = sps.linalg.eigsh(L, k=num_eig, which='SM')
     if return_L:
-        return w, v, L_sym.toarray()
+        return w, v, L.toarray()
     return w, v

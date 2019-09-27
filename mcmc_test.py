@@ -13,6 +13,7 @@ def test2moons(show_plot=False, run_ipy=False):
     print("Running 2 moons test of MCMC sampler, Gaussian Regression")
     # load the 2 moons data, plot initial distribution of labeled and unlabeled
     data = load_2_moons()
+    print(data.evals.shape)
     if show_plot:
         data.plot_initial()
 
@@ -278,11 +279,11 @@ if __name__ == "__main__":
 
 
 
-    #test2moons(show_plot, run_ipy)
+    test2moons(show_plot, run_ipy)
     #testG3_GR(show_plot, run_ipy)
     #testG3_GPS(show_plot, run_ipy)
     #testMNIST(run_ipy)
     #test_pCn(run_ipy)
-    test_pCn2(run_ipy)
+    #test_pCn2(run_ipy)
     #test_GProb2(run_ipy)
     #test_HUJI(run_ipy)
