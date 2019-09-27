@@ -17,7 +17,7 @@ Code for Uncertainty Quantification sampling, certain functions ported over from
 ## Uncertainty Quantification in Graph Based Semi-Supervised Learning
 We approach the problem of semi-supervised learning for classification with a graph based approach for Bayesian inverse problems, in which we define a function on the nodes of a similarity graph representing the dataset and use that function to model the labeling of the underlying datapoints. Solving this inverse problem then reduces to minimizing a functional with respect to this node function, giving us a point estimate. Many machine learning algorithms likewise seek to find point estimates of corresponding posterior distributions for their respectively defined model. All models considered in this code base have posterior distributions that can be written in the form:
 
-- <img src="https://latex.codecogs.com/gif.latex? P(u | y) " />
+<p align="center"><img src="https://rawgit.com/millerk22/UQ_Python/master/svgs/5c9c626493e53ee49b58a58dfd447ea7.svg?invert_in_darkmode" align=middle width=374.80409999999995pt height=39.30498pt/></p>
 
 
 We further seek to quantify our confidence or certainty in the our outputs. Appealing to the Bayesian nature of the models involved, we use samples from the posterior distributions corresponding to the respective models to characterize the uncertainty of our outputs. In this way, we obtain more than just a point estimate of the posterior distribution. These samples allow us to give not only predictions about the classification of unlabeled nodes, but also have some idea of confidence about such predictions.
