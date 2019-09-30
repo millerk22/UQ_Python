@@ -112,7 +112,7 @@ def testMNIST(run_ipy=False):
 
     print('\nRunning Sampling...')
     tic_ = time.process_time()
-    GPS.run_sampler(1500, burnIn=1000)
+    GPS.run_sampler(10000, burnIn=5000)
     print('\tGPS Sampling took %f seconds' % (time.process_time() - tic_))
     gps_acc_u, gps_acc_u_t = GPS.comp_mcmc_stats()
     print("Accuracy of GPS: acc_u = %f, acc_u_t = %f" % (gps_acc_u, gps_acc_u_t))
@@ -279,10 +279,10 @@ if __name__ == "__main__":
 
 
 
-    test2moons(show_plot, run_ipy)
+    #test2moons(show_plot, run_ipy)
     #testG3_GR(show_plot, run_ipy)
     #testG3_GPS(show_plot, run_ipy)
-    #testMNIST(run_ipy)
+    testMNIST(run_ipy)
     #test_pCn(run_ipy)
     #test_pCn2(run_ipy)
     #test_GProb2(run_ipy)

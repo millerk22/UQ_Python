@@ -16,10 +16,29 @@ from util.util import plot_iter_multi, plot_iter, calc_stats_multi
 
 
 
-"""TODO for Active Learning: Need a way to have an "original" fid dictionary, that can then pass to
- different runs of Active Learning with UQ samples. Or just have function to
- undo all of the added fidelity points."""
+
 class Data_obj(object):
+    """
+        Object for storing the important, dataset specific attributes for use by the
+        MCMC_Sampler classes in ``mcmc_classes.py``. Instantiation requires:
+            - X : (N x d) input data, though can be None if data is too large.
+            - evals : (num_eigs, ) numpy array of eigenvalues of graph Laplacian
+            - evecs : (N x num_eigs) numpy array, columns are the eigenvectors
+            - fid : python dict with (class : indices) of the labeled nodes for the dataset
+            - ground_truth : (N, ) numpy array with the ground truth labelings for each corresponding
+                index's node.
+
+        Member Functions:
+            - get_useful_structs() : After instantiating the Data_obj with these required attributes, calculate
+                useful structures for later use in the sampling algorithms.
+            - plot_initial(): If data in X is 2-dimensional, plot the dataset. (Currently
+                only implemented for 2D data)
+            - plot_iteration(u): If data in X is 2-dimensional, plot the dataset with colors according
+                to values in given parameter u ( a (N,) numpy array). (Currently only implemented
+                for 2D data)
+
+    """
+
     def __init__(self, X, evals, evecs, fid, ground_truth):
         self.X = X
         self.evals = evals
@@ -92,8 +111,13 @@ class Data_obj(object):
             plot_iter_multi(stats, self.X, self.fid, k_next=-1)
 
 
-    ### function to reset Data object to orig labeled, fid, unlabeled for AL?
+    """TODO for Active Learning: Need a way to have an "original" fid dictionary, that can then pass to
+     different runs of Active Learning with UQ samples. Or just have function to
+     undo all of the added fidelity points."""
 
+
+
+""" Functions that load different datasets into Data_obj objects. """
 
 
 
@@ -124,7 +148,7 @@ def load_2_moons(N=2000, noise=0.2, sup_percent=0.05, normed_lap=False, num_eig=
     return Data_obj(X, evals, evecs, fid, ground_truth)
 
 
-def load_gaussian_cluster(Ns, means, covs, sup_percent=0.05, normed_lap=False, seed=None):
+def load_gaussian_cluster(Ns, means, covs, sup_percent=0.05, k_nn=5, normed_lap=False, seed=None):
     print("Loading the Gaussian Cluster data with %d clusters..." % len(means))
     if len(Ns) != len(means):
         raise ValueError('Must have same number of means as clusters in Ns')
@@ -132,7 +156,7 @@ def load_gaussian_cluster(Ns, means, covs, sup_percent=0.05, normed_lap=False, s
         raise ValueError('Must have same number of means as covariance matrices')
     N = sum(Ns)
     classes = [i for i in range(len(Ns))]
-    X, W, ground_truth = generate_gauss_clus_graphs(Ns, means, covs)
+    X, W, ground_truth = generate_gauss_clus_graphs(Ns, means, covs, k_nn=k_nn)
     evals, evecs = get_eig_Lnorm(W, normed_=normed_lap)
 
     indices = np.array(list(range(N)))
@@ -328,7 +352,7 @@ def load_CITESEER(filepath='./datasets/CITESEER/', Ltype='n', num_eig=None, sup_
 
 
 
-################# Graph generation and other Calculations
+################# Graph generation and other calculations ######################
 
 def sqdist(X, Y):
     # Michael Luo code  - X is (d x m) np array, Y is (d x n) np array
@@ -395,6 +419,7 @@ def get_eig_Lnorm(W, num_eig=None, normed_=True, return_L=False):
     L = sps.csgraph.laplacian(W, normed=normed_)
     print('Finished making Laplacian, now calculating the eval/evecs')
     if num_eig > int(W.shape[0]/2):
+        print('Converting to dense since computing more than half of eigenvectors...')
         w, v = sla.eigh(L.toarray(), eigvals=(0,num_eig-1))
     else:
         w, v = sps.linalg.eigsh(L, k=num_eig, which='SM')
