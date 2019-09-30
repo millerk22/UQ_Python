@@ -275,6 +275,7 @@ def load_MNIST(digits=[1,4,7,9], num_points=4*[500], num_eig=300, Ltype='n', sup
 
 
 
+
 def load_gas_plume(num_eig=1000, Ltype='n', sup_percent=0.05, k_nn=15, seed=10):
     print("Loading the GasPlume data...")
     # filepath and filename creation for checking if this data has already been computed before
@@ -351,6 +352,37 @@ def load_CITESEER(filepath='./datasets/CITESEER/', Ltype='n', num_eig=None, sup_
     return Data_obj(None, evals, evecs, fid, ground_truth)
 
 
+def load_voting_records(filepath='./datasets/VOTING-RECORD/', 
+                        Ltype='n', num_eig=None, 
+                        sup_percent=0.1, seed=1):
+    filename = 'house-votes-84.data'
+    # load the file directly into X format
+    with open(filepath + filename, 'w') as f:
+        lines = list(f)
+        f.close()
+    vote2num = {'y' : 1, 'n' : -1, '?' : 0} # maps y, n, ? to numerical values
+    party2num = {'democrat' : 1, 'republican' : -1}
+    X = [map(lambda x: vote2num[x], line.split(',')[1:]) for line in lines]
+    label = [party2num[line.split(',')[0]] for line in lines]
+    del lines
+    # setup fid
+    # -1 case
+    m1_ind = np.where(labels == -1)[0]
+    np.random.shuffle(m1_ind)
+    fid[-1] = list(m1_ind[:int(sup_percent*len(m1_ind))])
+    # +1 case
+    p1_ind = np.where(labels_sub == 1)[0]
+    np.random.shuffle(p1_ind)
+    fid[1] = list(p1_ind[:int(sup_percent*len(p1_ind))])
+    # setup similarity graphs etc
+    W = make_sim_graph(X, k_nn=len(labels)-1) # fully connected
+    if Ltype == 'n':
+        evals, evecs = get_eig_Lnorm(W, num_eig=num_eig, normed_=True)
+    else:
+        evals, evecs = get_eig_Lnorm(W, num_eig=num_eig, normed_=False)
+    # WIP
+    return 
+    
 
 ################# Graph generation and other calculations ######################
 
