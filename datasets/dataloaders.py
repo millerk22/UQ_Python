@@ -357,21 +357,24 @@ def load_voting_records(filepath='./datasets/VOTING-RECORD/',
                         sup_percent=0.1, seed=1):
     filename = 'house-votes-84.data'
     # load the file directly into X format
-    with open(filepath + filename, 'w') as f:
+    with open(filepath + filename, 'r') as f:
         lines = list(f)
         f.close()
     vote2num = {'y' : 1, 'n' : -1, '?' : 0} # maps y, n, ? to numerical values
     party2num = {'democrat' : 1, 'republican' : -1}
-    X = [map(lambda x: vote2num[x], line.split(',')[1:]) for line in lines]
-    label = [party2num[line.split(',')[0]] for line in lines]
+    X = [list(map(lambda x: vote2num[x], line.strip().split(',')[1:])) for line in lines]
+    X = np.array(X)
+    labels = [party2num[line.split(',')[0]] for line in lines]
+    labels = np.array(labels)
     del lines
     # setup fid
     # -1 case
+    fid = {}
     m1_ind = np.where(labels == -1)[0]
     np.random.shuffle(m1_ind)
     fid[-1] = list(m1_ind[:int(sup_percent*len(m1_ind))])
     # +1 case
-    p1_ind = np.where(labels_sub == 1)[0]
+    p1_ind = np.where(labels == 1)[0]
     np.random.shuffle(p1_ind)
     fid[1] = list(p1_ind[:int(sup_percent*len(p1_ind))])
     # setup similarity graphs etc
@@ -381,7 +384,7 @@ def load_voting_records(filepath='./datasets/VOTING-RECORD/',
     else:
         evals, evecs = get_eig_Lnorm(W, num_eig=num_eig, normed_=False)
     # WIP
-    return 
+    return Data_obj(X, evals, evecs, fid, labels)
     
 
 ################# Graph generation and other calculations ######################
