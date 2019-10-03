@@ -194,8 +194,8 @@ def syn_run_test(T, ALPHAS, Ns, B, labeled, u, W_0, normalized=True, little_oh=F
 
         for i,alpha in enumerate(ALPHAS):
             gamma = tau**alpha
-            d = (tau ** (2 * alpha)) * np.power(w + tau**2., -alpha)     # diagonalization of C_t,e - will be used later
-            d_inv = 1./d  # the eigenvalues of C_\tau,\eps^{-1}
+            d_inv = (tau ** (-2. * alpha)) * np.power(w + tau**2., alpha)     # diagonalization of C_t,e - will be used later
+
 
             if all_norms: # only calculate the parts of the triangle inequality if want to track all norms
                 C_tau_inv_u = (v*d_inv.reshape(1,N)).dot(v.T.dot(u_n))
@@ -213,11 +213,10 @@ def syn_run_test(T, ALPHAS, Ns, B, labeled, u, W_0, normalized=True, little_oh=F
                 C_tau_inv_u_p2 = (v_K*d_K.reshape(1,N-K)).dot(v_K.T.dot(u_n))
                 normC_tau_inv_u_p2[i,j] = sp.linalg.norm(C_tau_inv_u_p2)
 
-
-
             # prior_inv : C_{tau,eps}^{-1}, where
             # C_{tau, eps}^{-1} = tau^{-2alpha}(L + tau^2 I)^alpha
-            prior_inv = v.dot(sp.sparse.diags([1./thing for thing in d], format='csr').dot(v.T))
+            prior_inv = v.dot(sp.sparse.diags(d_inv, format='csr').dot(v.T))
+
             # B/gamma^2
             B_over_gamma2 = B / (gamma * gamma)
             # post_inv  : (B/gamma^2 + C_{tau,\eps}^{-1})^{-1}
@@ -225,7 +224,7 @@ def syn_run_test(T, ALPHAS, Ns, B, labeled, u, W_0, normalized=True, little_oh=F
             # C^{-1}
             post = post_inv.I
             bias = sp.linalg.norm(post.dot(prior_inv.dot(u_n)))
-            BIAS[i,j] = bias
+            BIAS[i,j] = bias**2.
             if all_norms:
                 normC[i,j] = sp.linalg.norm(post)
 
@@ -240,6 +239,55 @@ def syn_run_test(T, ALPHAS, Ns, B, labeled, u, W_0, normalized=True, little_oh=F
 
     if all_norms:
         return TRC, TRCBC, normC, normC_tau_inv_u, normC_tau_inv_u_p1, normC_tau_inv_u_p2, BIAS
+
+    return TRC, TRCBC, BIAS
+
+
+def syn_run_test0(T, ALPHAS, Ns, B, labeled, u, W_0, normalized=True, seed=None):
+    """
+    Calculate a LOT of different values, now with the input being normalized.
+    """
+    TRC = np.zeros((len(ALPHAS), len(T)))
+    TRCBC = np.zeros((len(ALPHAS), len(T)))
+    BIAS = np.zeros((len(ALPHAS), len(T)))
+
+    K = len(Ns)
+    N = sum(Ns)
+    u_n = u[:,0]/sp.linalg.norm(u[:,0])   # normalized vector for use in the BIAS calculation
+
+    w, v = get_eig_Lnorm(W_0, normed_=normalized)
+
+
+    # For each value of tau given in the list T
+    for j, tau in enumerate(T):
+
+
+        for i,alpha in enumerate(ALPHAS):
+            d_inv = (tau ** (-2. * alpha)) * np.power(w + tau**2., alpha)     # diagonalization of C_t,0 - will be used later
+
+            # prior_inv : C_{tau,0}^{-1}, where
+            # C_{tau, 0}^{-1} = tau^{-2alpha}(L + tau^2 I)^alpha
+            prior_inv = v.dot(sp.sparse.diags(d_inv, format='csr').dot(v.T))
+
+            gamma = tau**alpha
+
+            # B/gamma^2
+            B_over_gamma2 = B / (gamma * gamma)
+            # post_inv  : (B/gamma^2 + C_{tau,\eps}^{-1})^{-1}
+            post_inv  = prior_inv + B_over_gamma2
+            # C^{-1}
+            post = post_inv.I
+            bias = sp.linalg.norm(post.dot(prior_inv.dot(u_n)))
+            BIAS[i,j] = bias**2.
+
+            # Calculate Tr(C)
+            trC = sp.trace(post)
+            TRC[i,j] = trC
+
+            # Calculate Tr(CBC)/gamma^2
+            post2 = post.dot(post)
+            trCBC = sp.trace(post2[np.ix_(labeled[0], labeled[0])])
+            TRCBC[i,j] = trCBC/(gamma**2.)
 
     return TRC, TRCBC, BIAS
 
@@ -386,7 +434,7 @@ def get_voting_data(sup_percent=0.1, filepath='datasets/VOTING-RECORD/', seed=No
     return X, labels, fid
 
 
-def voting_run_test(SIGMAS, T, ALPHAS, rand=False, sup_percent=0.1, seed=None, k_nn=5, normalized=True, all_norms=False):
+def voting_run_test(SIGMAS, T, ALPHAS, rand=False, sup_percent=0.1, seed=None, k_nn=5, normalized=True):
     # Voting Record graph initializations
     X, labels, fid = get_voting_data(sup_percent=sup_percent, seed=seed)
     org_indices = np.argsort(labels)
@@ -440,51 +488,50 @@ def voting_run_test(SIGMAS, T, ALPHAS, rand=False, sup_percent=0.1, seed=None, k
     lab_ind.extend(list(fid[-1]))
     diag = np.zeros(N)
     diag[lab_ind] = 1.
-    B = np.diag(diag)
+    B = sp.sparse.diags(diag, format='csr')
 
     # Data matrices for recording values
-    TRC = np.zeros((len(ALPHAS), len(T)))
-    TRCBC = np.zeros((len(ALPHAS), len(T)))
-    BIAS = np.zeros((len(ALPHAS), len(T)))
+    TRC = np.zeros((len(ALPHAS), len(T), len(SIGMAS)))
+    TRCBC = np.zeros((len(ALPHAS), len(T), len(SIGMAS)))
+    BIAS = np.zeros((len(ALPHAS), len(T), len(SIGMAS)))
 
-    for sigma in SIGMAS:
+    EVALS = []
+
+    for k,sigma in enumerate(SIGMAS):
         # Get weight matrix with given kernel width, sigma.
         #w_sp = np.exp(-w_sp0/sigma)
         w_sp = np.exp(-(w_sp0 * w_sp0)/sigma) # I think this old code is actually squaring the already squared distances...?
         W_s = csr_matrix((w_sp.flatten(), (I, J)), shape=(N,N))
         W_s = 0.5*(W_s+W_s.T)
         evals, evecs = get_eig_Lnorm(W_s, num_eig=None, normed_=normalized)
-
+        EVALS.append(evals[1])
         # For each value of tau given in the list T
         for j, tau in enumerate(T):
             for i, alpha in enumerate(ALPHAS):
                 gamma = tau**alpha
-                d = (tau ** (2 * alpha)) * np.power(evals + tau**2., -alpha)     # diagonalization of C_t,e - will be used later
-                d_inv = 1./d
+                d_inv = (tau ** (-2. * alpha)) * np.power(evals + tau**2., alpha)     # diagonalization of C_t,e - will be used later
 
                 # prior_inv : C_{tau,eps}^{-1}, where
                 # C_{tau, eps}^{-1} = tau^{-2alpha}(L + tau^2 I)^alpha
-                prior_inv = evecs.dot(sp.sparse.diags([1./thing for thing in d], format='csr').dot(evecs.T))
+                prior_inv = evecs.dot(sp.sparse.diags(d_inv, format='csr').dot(evecs.T))
                 # B/gamma^2
-                B_over_gamma2 = B / (gamma * gamma)
+                B_over_gamma2 = B / (gamma**2.)
                 # post_inv  : (B/gamma^2 + C_{tau,\eps}^{-1})^{-1}
                 post_inv  = prior_inv + B_over_gamma2
                 # C^{-1}
                 post = sp.linalg.inv(post_inv)
                 bias = sp.linalg.norm(post.dot(prior_inv.dot(u_n)))
-                BIAS[i,j] = bias
-                if all_norms:
-                    normC[i,j] = sp.linalg.norm(post)
+                BIAS[i,j,k] = bias**2.
 
                 # Calculate Tr(C)
                 trC = sp.trace(post)
-                TRC[i,j] = trC
+                TRC[i,j,k] = trC
 
                 # Calculate Tr(CBC)/gamma^2
                 post2 = post.dot(post)
                 trCBC = sp.trace(post2[np.ix_(labeled, labeled)])
-                TRCBC[i,j] = trCBC/(gamma**2.)
-
+                TRCBC[i,j,k] = trCBC/(gamma**2.)
+    print("Spectral gap evals are: %s" % str(EVALS))
     return TRC, TRCBC, BIAS
 
 def voting_plot_data(T, data, ALPHAS, param_str, title_=r'$\mathrm{Tr}(C^*)$', val_str="TRC", save=False, Jval=-1, _fontsize=25):
@@ -512,13 +559,41 @@ def voting_plot_data(T, data, ALPHAS, param_str, title_=r'$\mathrm{Tr}(C^*)$', v
     plt.xlabel(r'$\tau$', fontsize=_fontsize)
     plt.ylabel(title_, fontsize=_fontsize)
     ax.tick_params(axis='both', which='major', labelsize=_fontsize)
-    plt.legend(fontsize=15)
+    if val_str == "BIAS":
+        plt.legend(fontsize=15, loc='lower right')
+    else:
+        plt.legend(fontsize=15)
     plt.tight_layout()
     if save:
         print("Saving figure at ./figures/paper/%s_%s.png" % (param_str, val_str))
         plt.savefig('./figures/BPCpaper/%s_%s.png' % (param_str, val_str))
     else:
         plt.title(title_ + r', $\gamma = \tau^\alpha$', fontsize=15)
+    plt.show()
+
+    return
+
+def voting_plot_data2(T, data, SIGMAS, param_str, title_=r'$\mathrm{Tr}(C^*)$', val_str="TRC", save=False, _fontsize=25):
+    n_sigma = len(SIGMAS)
+    markers = ['o','*', 'v', '^', '<', '>', '8', 's', 'p', 'h']
+    fig = plt.figure()
+    ax = fig.gca()
+    ax.loglog(T, data)
+    for i, sigma in enumerate(SIGMAS):
+        ax.scatter(T, data[:,i], marker=markers[i], label=r'$\sigma =$ %2.1f'% sigma)
+    plt.xlabel(r'$\tau$', fontsize=_fontsize)
+    plt.ylabel(title_, fontsize=_fontsize)
+    ax.tick_params(axis='both', which='major', labelsize=_fontsize)
+    if val_str == "BIAS":
+        plt.legend(fontsize=15, loc='lower right')
+    else:
+        plt.legend(fontsize=15)
+    plt.tight_layout()
+    if save:
+        print("Saving figure at ./figures/paper/%s_%s.png" % (param_str, val_str))
+        plt.savefig('./figures/BPCpaper/%s_%s.png' % (param_str, val_str))
+    else:
+        plt.title(title_, fontsize=15)
     plt.show()
 
     return
