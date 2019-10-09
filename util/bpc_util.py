@@ -339,6 +339,64 @@ def syn_plot_data(T, data, ALPHAS, param_str, title_=r'$\mathrm{Tr}(C^*)$', val_
     return
 
 
+def syn_plot_data_range(T, data, ALPHAS, param_str, t_ranges=None,title_=r'$\mathrm{Tr}(C^*)$', val_str="TRC", save=False, _fontsize=25, little_oh=False, zero=False):
+    """
+        Generic plotting function for showing values contained in the matrix ``data``
+        and title given in the input string ``title_``.
+
+        If want to fit the the line, input value Jval >= 0. (the index where to start)
+    """
+    file_string = param_str + '_'+ val_str+ '\nalpha,slope\n'
+    n_alpha = len(ALPHAS)
+    n_tau = len(T)
+    if t_ranges is None:
+        t_ranges = [(0,n_tau) for i in range(n_alpha)]
+    # Fit the line for T[J[i]:], data[i,:]
+    print('Line fitting for %s' % val_str)
+    line_stats = np.zeros((n_alpha,2))
+    for i in range(n_alpha):
+        j_start, j_end = t_ranges[i]
+        t = np.log(T[j_start:j_end])
+        A = np.array([t, np.ones(len(t))]).T
+        b = np.log(data[i,j_start:j_end])
+        res = lsq_linear(A, b)
+        line_stats[i,:] = res.x
+        print('The slope for alpha = %1.1f is : %2.4f' % (ALPHAS[i], res.x[0]))
+        file_string += '%1.1f, %2.4f\n' % (ALPHAS[i], res.x[0])
+
+
+    markers = ['o','*', 'v', '^', '>', 's', '<', 'p', 'h']
+    colors = ['b', 'r', 'g', 'purple', 'cyan', 'k','orange' , 'brown']
+    fig = plt.figure()
+    ax = fig.gca()
+    #ax.loglog(T, data.T)
+    for i, alpha in enumerate(ALPHAS):
+        ax.loglog(T, data[i,:], c=colors[i])
+        ax.scatter(T, data[i,:], marker=markers[i], c=colors[i], label=r'$\alpha =$ %2.1f'% alpha)
+        ax.scatter(T[t_ranges[i][0]],data[i,t_ranges[i][0]], c=colors[i], marker=markers[i], s=150)
+        ax.scatter(T[t_ranges[i][1]-1],data[i,t_ranges[i][1]-1], c=colors[i], marker=markers[i], s=150)
+    plt.xlabel(r'$\tau$', fontsize=_fontsize)
+    plt.ylabel(title_, fontsize=_fontsize)
+    ax.tick_params(axis='both', which='major', labelsize=_fontsize)
+    plt.legend(fontsize=15)
+    plt.tight_layout()
+    if save:
+        print("Saving figure at ./figures/BPCpaper/%s_%s.png" % (param_str, val_str))
+        plt.savefig('./figures/BPCpaper/%s_%s.png' % (param_str, val_str))
+        with open('./figures/BPCpaper/%s_%s.txt' % (param_str, val_str), 'w') as file:
+            file.write(file_string)
+    else:
+        if little_oh: # eps = o(tau^2)
+            plt.title(title_ + r', $\epsilon = \tau^3, \gamma = \tau^\alpha$', fontsize=15)
+        elif not little_oh and zero: # eps = 0
+            plt.title(title_ + r', $\epsilon = 0, \gamma = \tau^\alpha$', fontsize=15)
+        else: # eps = O(tau^2)
+            plt.title(title_ + r', $\epsilon = \tau^2, \gamma = \tau^\alpha$', fontsize=15)
+    plt.show()
+
+    return
+
+
 
 
 
