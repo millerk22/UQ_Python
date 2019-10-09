@@ -339,12 +339,10 @@ def syn_plot_data(T, data, ALPHAS, param_str, title_=r'$\mathrm{Tr}(C^*)$', val_
     return
 
 
-def syn_plot_data_range(T, data, ALPHAS, param_str, t_ranges=None,title_=r'$\mathrm{Tr}(C^*)$', val_str="TRC", save=False, _fontsize=25, little_oh=False, zero=False):
+def syn_plot_data_range(T, data, ALPHAS, param_str, file2save=None, t_ranges=None,title_=r'$\mathrm{Tr}(C^*)$', val_str="TRC", save=False, _loc='lower right',_fontsize=25, _rms=150, little_oh=False, zero=False):
     """
         Generic plotting function for showing values contained in the matrix ``data``
         and title given in the input string ``title_``.
-
-        If want to fit the the line, input value Jval >= 0. (the index where to start)
     """
     file_string = param_str + '_'+ val_str+ '\nalpha,slope\n'
     n_alpha = len(ALPHAS)
@@ -366,25 +364,34 @@ def syn_plot_data_range(T, data, ALPHAS, param_str, t_ranges=None,title_=r'$\mat
 
 
     markers = ['o','*', 'v', '^', '>', 's', '<', 'p', 'h']
-    colors = ['b', 'r', 'g', 'purple', 'cyan', 'k','orange' , 'brown']
+    #colors = ['b', 'r', 'g', 'purple', 'cyan', 'k','orange' , 'brown']
+    prop_cycle = plt.rcParams['axes.prop_cycle']
+    colors = prop_cycle.by_key()['color']
+
     fig = plt.figure()
     ax = fig.gca()
     #ax.loglog(T, data.T)
     for i, alpha in enumerate(ALPHAS):
         ax.loglog(T, data[i,:], c=colors[i])
         ax.scatter(T, data[i,:], marker=markers[i], c=colors[i], label=r'$\alpha =$ %2.1f'% alpha)
-        ax.scatter(T[t_ranges[i][0]],data[i,t_ranges[i][0]], c=colors[i], marker=markers[i], s=150)
-        ax.scatter(T[t_ranges[i][1]-1],data[i,t_ranges[i][1]-1], c=colors[i], marker=markers[i], s=150)
+        ax.scatter(T[t_ranges[i][0]],data[i,t_ranges[i][0]], c=colors[i], marker=markers[i], s=_rms)
+        ax.scatter(T[t_ranges[i][1]-1],data[i,t_ranges[i][1]-1], c=colors[i], marker=markers[i], s=_rms)
     plt.xlabel(r'$\tau$', fontsize=_fontsize)
     plt.ylabel(title_, fontsize=_fontsize)
     ax.tick_params(axis='both', which='major', labelsize=_fontsize)
-    plt.legend(fontsize=15)
+    plt.legend(fontsize=15, loc=_loc)
     plt.tight_layout()
     if save:
-        print("Saving figure at ./figures/BPCpaper/%s_%s.png" % (param_str, val_str))
-        plt.savefig('./figures/BPCpaper/%s_%s.png' % (param_str, val_str))
-        with open('./figures/BPCpaper/%s_%s.txt' % (param_str, val_str), 'w') as file:
-            file.write(file_string)
+        if file2save is None:
+            print("Saving figure at ./figures/BPCpaper/%s_%s.png" % (param_str, val_str))
+            plt.savefig('./figures/BPCpaper/%s_%s.png' % (param_str, val_str))
+            with open('./figures/BPCpaper/%s_%s.txt' % (param_str, val_str), 'w') as file:
+                file.write(file_string)
+        else:
+            print("Saving figure at %s%s_%s.png" % (file2save, param_str, val_str))
+            plt.savefig('%s%s_%s.png' % (file2save, param_str, val_str))
+            with open('%s%s_%s.txt' % (file2save, param_str, val_str), 'w') as file:
+                file.write(file_string)
     else:
         if little_oh: # eps = o(tau^2)
             plt.title(title_ + r', $\epsilon = \tau^3, \gamma = \tau^\alpha$', fontsize=15)
@@ -395,9 +402,6 @@ def syn_plot_data_range(T, data, ALPHAS, param_str, t_ranges=None,title_=r'$\mat
     plt.show()
 
     return
-
-
-
 
 
 
