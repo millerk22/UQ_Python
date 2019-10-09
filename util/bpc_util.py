@@ -405,12 +405,6 @@ def syn_plot_data_range(T, data, ALPHAS, param_str, t_ranges=None,title_=r'$\mat
 
 
 
-
-
-
-
-
-
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 ################# Graph generation and other calculations ######################
