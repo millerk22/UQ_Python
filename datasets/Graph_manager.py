@@ -24,9 +24,9 @@ class Graph_manager(object):
     self.eigenvectors
     """
 
-    def __init__(self, experiment_name):
+    def __init__(self, experiment_name, N=None):
         self.experiment_name = experiment_name
-        self.N = None
+        self.N = N
         return
 
 
@@ -55,29 +55,27 @@ class Graph_manager(object):
         """
         pass
 
-
     # Only for Data_obj
     def from_features(self, params):
         """
         load from features using params
         params:
             data_uri
-            fileame
             knn
             sigma
             Ltype
             n_eigs
         """
         prev_run = get_prev_run('Graph_manager.from_features', 
-                                params, None, self.experiment_name)
+                                params, None)
         if prev_run is not None:
-            # load previously compute eigenvector, eigenvalue
-            return
+            print('Found previous eigs')
+            return os.path.join(prev_run.info.artifact_uri, 'eigs')
         with mlflow.start_run(nested=True):
+            print('Compute eigs')
             mlflow.set_experiment(self.experiment_name)
             mlflow.set_tag('function', 'Graph_manager.from_features')
             mlflow.log_params(params)
-
             data = load_uri(params['data_uri'], 'data.npz')
             self.N = len(data['X'])
             A = self.sqdist(data['X'].T, data['X'].T)
@@ -92,6 +90,8 @@ class Graph_manager(object):
             mlflow.log_artifact('eigs.npz', 'eigs')
             os.remove('eigs.npz')
             return mlflow.get_artifact_uri('eigs')
+    
+
 
     def sqdist(self, X, Y):
         """

@@ -2,8 +2,7 @@ import mlflow
 import os
 import numpy as np
 
-def get_prev_run(function, params, git_commit, experiment_name):
-    mlflow.set_experiment(experiment_name)
+def get_prev_run(function, params, git_commit):
     query = 'attributes.status = "FINISHED"'
     query += ' and tags."function" = "{}"'.format(function)
     for key, val in params.items():

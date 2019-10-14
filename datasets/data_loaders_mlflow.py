@@ -10,13 +10,10 @@ import numpy as np
 from util.mlflow_util import get_prev_run
 
 def load_voting_records(filepath='./datasets/VOTING-RECORD/'):
-    print("Process raw voting records data")
-    mlflow.set_experiment('voting-record')
     prev_run = get_prev_run(
         function    = 'data_loaders_mlflow.load_voting_records', 
         params      = {}, 
-        git_commit  = None,
-        experiment_name = 'voting-record')
+        git_commit  = None)
     if prev_run is not None:
         print("Found previously processed voting record data")
         data_uri = os.path.join(
@@ -24,6 +21,7 @@ def load_voting_records(filepath='./datasets/VOTING-RECORD/'):
             'data')
         return data_uri
     with mlflow.start_run(nested=True) as mlrun:
+        print('Process voting record data')
         mlflow.set_tag('function', 'data_loaders_mlflow.load_voting_records')
         filename = 'house-votes-84.data'
         with open(filepath + filename, 'r') as f:
