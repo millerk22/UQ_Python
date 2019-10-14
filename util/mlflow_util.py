@@ -8,7 +8,6 @@ def get_prev_run(function, params, git_commit):
     for key, val in params.items():
         query += ' and '
         query += 'params.{} = "{}"'.format(key, val) 
-    print(query)
     runs = mlflow.search_runs(filter_string=query)
     if runs.empty:
         return None

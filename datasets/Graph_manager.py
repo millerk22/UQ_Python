@@ -24,8 +24,7 @@ class Graph_manager(object):
     self.eigenvectors
     """
 
-    def __init__(self, experiment_name, N=None):
-        self.experiment_name = experiment_name
+    def __init__(self, N=None):
         self.N = N
         return
 
@@ -73,7 +72,6 @@ class Graph_manager(object):
             return os.path.join(prev_run.info.artifact_uri, 'eigs')
         with mlflow.start_run(nested=True):
             print('Compute eigs')
-            mlflow.set_experiment(self.experiment_name)
             mlflow.set_tag('function', 'Graph_manager.from_features')
             mlflow.log_params(params)
             data = load_uri(params['data_uri'], 'data.npz')
@@ -88,7 +86,6 @@ class Graph_manager(object):
             w, v = self.compute_spectrum(A, n_eigs=params['n_eigs'])
             np.savez('eigs.npz', w=w, v=v)
             mlflow.log_artifact('eigs.npz', 'eigs')
-            os.remove('eigs.npz')
             return mlflow.get_artifact_uri('eigs')
     
 

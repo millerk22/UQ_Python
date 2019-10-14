@@ -1,4 +1,3 @@
-#from mcmc_classes import *
 from datasets.data_loaders_mlflow import load_voting_records
 from util.mlflow_util import get_prev_run, load_uri
 import mlflow
@@ -6,22 +5,20 @@ import numpy as np
 import scipy as sp
 from datasets.Graph_manager import Graph_manager
 
-
 def compute_groundtruth_u(X, labels, params):
     sigma = params['sigma']
     knn = params['knn']
     Ltype = params['Ltype']
 
-    gm = Graph_manager(None, X.shape[0])
-    A = gm.sqdist(X.T, X.T)
-    pos  = np.where(labels == 1)[0]
+    gm = Graph_manager(N = X.shape[0])
+    A  = gm.sqdist(X.T, X.T)
+    pos = np.where(labels == 1)[0]
     neg = np.where(labels == -1)[0]
     W = gm.compute_similarity_graph(A, knn, sigma) 
     W[np.ix_(pos, neg)] = 0
     W[np.ix_(neg, pos)] = 0
-    D = np.array(np.sqrt(np.sum(W, axis=1))).flatten()  #sqrt of the degrees
+    D = np.array(np.sqrt(np.sum(W, axis=1))).flatten()  # sqrt of the degrees
 
-    # These Chis are scaled by the diagonal matrix of our "epsilon=0" case of a smaller sigma than any in SIGMAS
     Chis = np.zeros((X.shape[0], 2))
     Chis[pos, 0] = 1./np.sqrt(len(pos))
     Chis[neg, 1] = 1./np.sqrt(len(neg))
@@ -30,21 +27,12 @@ def compute_groundtruth_u(X, labels, params):
         Chis[pos, 0] /= sp.linalg.norm(Chis[pos, 0])
         Chis[neg, 1] *= D[neg]
         Chis[neg, 1] /= sp.linalg.norm(Chis[neg, 1])
-    u = Chis.dot(np.diag(np.random.randn(2)))
-    u = u[:,0]/sp.linalg.norm(u[:,0])
+    u = np.sum(Chis, axis=1) 
+    u /= sp.linalg.norm(u)
     return u
 
 
 def voting_record_test(params):
-    """
-    if get_prev_run(
-        function    = 'voting_record_test', 
-        params      = params, 
-        git_commit  = None, 
-        experiment_name = 'voting-record') is not None:
-        print("Found previous voting-record test run")
-        return 
-    """
     """
     params:
         knn
@@ -56,11 +44,18 @@ def voting_record_test(params):
         tau
         alpha
     """
-    with mlflow.start_run() as mlrun:
+    if get_prev_run(
+        function    = 'voting_record_test', 
+        params      = params, 
+        git_commit  = None) is not None:
+        print("Found previous voting-record test run")
+        return 
+    with mlflow.start_run():
         mlflow.set_tag('function', 'voting_record_test')
         mlflow.log_params(params)
+        # compute or load data
         data_uri = load_voting_records()
-        gm = Graph_manager('voting-record')
+        gm = Graph_manager()
         graph_params = {
             'knn'   : params['knn'],
             'sigma' : params['sigma'],
@@ -68,6 +63,7 @@ def voting_record_test(params):
             'n_eigs': params['n_eigs'],
             'data_uri' : data_uri
         }
+        # compute or load eigenvectors and eigenvalues
         eigs = load_uri(gm.from_features(graph_params), 'eigs.npz')
         w, v = eigs['w'], eigs['v']
         # figure out groundtruth etc of disconnected graph
@@ -125,7 +121,6 @@ if __name__ == "__main__":
         'n_eigs'   : None,
         'n_fid'    : {1:5, -1:5},
     }
-    n = 10
     ALPHAS = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3.]
     SIGMAS = range(1,31) 
     for alpha in ALPHAS:
