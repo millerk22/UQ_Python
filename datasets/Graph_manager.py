@@ -87,8 +87,6 @@ class Graph_manager(object):
             np.savez('eigs.npz', w=w, v=v)
             mlflow.log_artifact('eigs.npz', 'eigs')
             return mlflow.get_artifact_uri('eigs')
-    
-
 
     def sqdist(self, X, Y):
         """
@@ -127,7 +125,6 @@ class Graph_manager(object):
             print('not implemented!')
         return L
 
-
     def compute_spectrum(self, L, n_eigs):
         """
         Computes first n_eigs smallest eigenvalues and eigenvectors
@@ -135,7 +132,6 @@ class Graph_manager(object):
         if n_eigs is None:
             n_eigs = self.N
         if n_eigs > int(self.N/2):
-            print('Converting to dense since computing more than half of eigenvectors...')
             w, v = sla.eigh(L.toarray(), eigvals=(0,n_eigs-1))
         else:
             w, v = sps.linalg.eigsh(L, k=n_eigs, which='SM')

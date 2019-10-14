@@ -20,13 +20,11 @@ def compute_groundtruth_u(X, labels, params):
     D = np.array(np.sqrt(np.sum(W, axis=1))).flatten()  # sqrt of the degrees
 
     Chis = np.zeros((X.shape[0], 2))
-    Chis[pos, 0] = 1./np.sqrt(len(pos))
-    Chis[neg, 1] = 1./np.sqrt(len(neg))
+    Chis[pos, 0] = 1.
+    Chis[neg, 1] = 1.
     if Ltype == 'normed':
-        Chis[pos, 0] *= D[pos]
-        Chis[pos, 0] /= sp.linalg.norm(Chis[pos, 0])
-        Chis[neg, 1] *= D[neg]
-        Chis[neg, 1] /= sp.linalg.norm(Chis[neg, 1])
+        Chis[:, 0] *= D
+        Chis[:, 1] *= D
     u = np.sum(Chis, axis=1) 
     u /= sp.linalg.norm(u)
     return u
@@ -122,7 +120,7 @@ if __name__ == "__main__":
         'n_fid'    : {1:5, -1:5},
     }
     ALPHAS = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3.]
-    SIGMAS = range(1,31) 
+    SIGMAS = [0.5 * i for i in range(1,31)] 
     for alpha in ALPHAS:
         for sigma in SIGMAS:
             graph_params['sigma'] = sigma
