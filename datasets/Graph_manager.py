@@ -28,6 +28,12 @@ class Graph_manager(object):
         self.N = N
         return
 
+    def __del__(self):
+        try:
+            os.remove('./eigs.npz')
+        except:
+            pass
+        return
 
     def load_data_obj(self, data_obj):
         """
@@ -55,7 +61,7 @@ class Graph_manager(object):
         pass
 
     # Only for Data_obj
-    def from_features(self, params):
+    def from_features(self, params, debug=False):
         """
         load from features using params
         params:
@@ -65,28 +71,36 @@ class Graph_manager(object):
             Ltype
             n_eigs
         """
-        prev_run = get_prev_run('Graph_manager.from_features', 
-                                params, None)
-        if prev_run is not None:
-            print('Found previous eigs')
-            return os.path.join(prev_run.info.artifact_uri, 'eigs')
+        if not debug:
+            prev_run = get_prev_run('Graph_manager.from_features', 
+                                    params, None)
+            if prev_run is not None:
+                print('Found previous eigs')
+                return os.path.join(prev_run.info.artifact_uri, 'eigs.npz')
+
+
+        print('Compute eigs')
+        data = load_uri(params['data_uri'])
+        self.N = len(data['X'])
+        A = self.sqdist(data['X'].T, data['X'].T)
+        A = self.compute_similarity_graph(
+            distance_mat = A, 
+            knn          = params['knn'],
+            sigma        = params['sigma'])
+        A = self.compute_laplacian(A,
+            Ltype = params['Ltype'])
+        w, v = self.compute_spectrum(A, n_eigs=params['n_eigs'])
+
+        np.savez('./eigs.npz', w=w, v=v)
+
+        if debug:
+            return './eigs.npz'
+
         with mlflow.start_run(nested=True):
-            print('Compute eigs')
             mlflow.set_tag('function', 'Graph_manager.from_features')
             mlflow.log_params(params)
-            data = load_uri(params['data_uri'], 'data.npz')
-            self.N = len(data['X'])
-            A = self.sqdist(data['X'].T, data['X'].T)
-            A = self.compute_similarity_graph(
-                distance_mat = A, 
-                knn          = params['knn'],
-                sigma        = params['sigma'])
-            A = self.compute_laplacian(A,
-                Ltype = params['Ltype'])
-            w, v = self.compute_spectrum(A, n_eigs=params['n_eigs'])
-            np.savez('eigs.npz', w=w, v=v)
-            mlflow.log_artifact('eigs.npz', 'eigs')
-            return mlflow.get_artifact_uri('eigs')
+            mlflow.log_artifact('./eigs.npz')
+            return os.path.join(mlflow.get_artifact_uri(), 'eigs.npz')
 
     def sqdist(self, X, Y):
         """

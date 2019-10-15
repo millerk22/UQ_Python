@@ -1,6 +1,7 @@
 import mlflow
 import os
 import numpy as np
+import urllib.parse
 
 def get_prev_run(function, params, git_commit):
     query = 'attributes.status = "FINISHED"'
@@ -16,6 +17,7 @@ def get_prev_run(function, params, git_commit):
         return mlflow.tracking.MlflowClient().get_run(
             runs.iloc[0].loc['run_id'])
 
-def load_uri(uri, filename, offset=7):
-    filepath = os.path.join(uri[offset:], filename)
-    return np.load(filepath)
+def load_uri(uri):
+    url_data = urllib.parse.urlparse(uri)
+    path = urllib.parse.unquote(url_data.path)
+    return np.load(path)

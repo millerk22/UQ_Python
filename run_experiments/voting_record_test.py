@@ -19,18 +19,26 @@ def compute_groundtruth_u(X, labels, params):
     W[np.ix_(neg, pos)] = 0
     D = np.array(np.sqrt(np.sum(W, axis=1))).flatten()  # sqrt of the degrees
 
-    Chis = np.zeros((X.shape[0], 2))
+    Chis = np.zeros((X.shape[0], 3))
     Chis[pos, 0] = 1.
     Chis[neg, 1] = 1.
     if Ltype == 'normed':
         Chis[:, 0] *= D
+        Chis[:, 0] /= sp.linalg.norm(Chis[:, 0])
         Chis[:, 1] *= D
-    u = np.sum(Chis, axis=1) 
-    u /= sp.linalg.norm(u)
+        Chis[:, 1] /= sp.linalg.norm(Chis[:, 1])
+        Chis[:, 2] = Chis[:,0] + Chis[:,1]
+        Chis[:, 2] /= sp.linalg.norm(Chis[:, 2])
+    # u = np.sum(Chis, axis=1) 
+    thetas = np.arange(0., 1.1, 0.1)
+    u = np.zeros((X.shape[0], len(thetas)))
+    for i, theta in enumerate(thetas):
+        u[:, i] = theta * Chis[:, 0] + (1-theta) * Chis[:, 1]
+        u[:, i] /= sp.linalg.norm(u[:, i])
     return u
 
 
-def voting_record_test(params):
+def voting_record_test(params, debug=False):
     """
     params:
         knn
@@ -42,75 +50,93 @@ def voting_record_test(params):
         tau
         alpha
     """
-    if get_prev_run(
-        function    = 'voting_record_test', 
-        params      = params, 
-        git_commit  = None) is not None:
-        print("Found previous voting-record test run")
-        return 
+    if not debug:
+        if get_prev_run(
+            function    = 'voting_record_test', 
+            params      = params, 
+            git_commit  = None) is not None:
+            print("Found previous voting-record test run")
+            return 
+
+
+    data_uri = load_voting_records(debug=debug)
+    gm = Graph_manager()
+    graph_params = {
+        'knn'   : params['knn'],
+        'sigma' : params['sigma'],
+        'Ltype' : params['Ltype'],
+        'n_eigs': params['n_eigs'],
+        'data_uri' : data_uri
+    }
+    # compute or load eigenvectors and eigenvalues
+    eigs = load_uri(gm.from_features(graph_params, debug=debug))
+    w, v = eigs['w'], eigs['v']
+    # figure out groundtruth etc of disconnected graph
+    data = load_uri(data_uri)
+    X, labels = data['X'], data['labels']
+
+    chis = compute_groundtruth_u(X, labels, params)
+    num_fid = params['n_fid']
+    fid = {
+        1 : np.where(labels == 1)[0][:num_fid[1]],
+        -1: np.where(labels ==-1)[0][:num_fid[-1]]
+    }
+    lab_ind = list(fid[1])
+    lab_ind.extend(list(fid[-1]))
+    diag = np.zeros(X.shape[0])
+    diag[lab_ind] = 1.
+    B = sp.sparse.diags(diag, format='csr')
+    # compute statistics
+    # load parameters
+    alpha = params['alpha']
+    T = np.power(0.6, range(5, 20))
+    log = {}
+    for i in range(chis.shape[1]):
+        log['bias_%d'%i] = []
+    log['trc'] = []
+    log['trcbc'] = []
+    for i, tau in enumerate(T):
+        gamma = tau**alpha
+        d_inv = (tau ** (-2. * alpha)) * np.power(w + tau**2., alpha)
+        # prior_inv : C_{tau,eps}^{-1}, where
+        # C_{tau, eps}^{-1} = tau^{-2alpha}(L + tau^2 I)^alpha
+        prior_inv = v.dot(sp.sparse.diags(d_inv, format='csr').dot(v.T))
+        # B/gamma^2
+        B_over_gamma2 = B /(gamma**2.)
+        # post_inv  : (B/gamma^2 + C_{tau,\eps}^{-1})^{-1}
+        post_inv  = prior_inv + B_over_gamma2
+        # C^{-1}
+        post = sp.linalg.inv(post_inv)
+        bias = sp.linalg.norm(post.dot(prior_inv.dot(chis)), axis=0)
+        for  ii, b in enumerate(bias):
+            log['bias_%d'%ii] +=  [b ** 2]
+        # Calculate Tr(C)
+        log['trc'] += [sp.trace(post)]
+        # Calculate Tr(CBC)/gamma^2
+        post2 = post.dot(post)
+        trCBC = sp.trace(post2[np.ix_(lab_ind, lab_ind)])
+        log['trcbc'] += [trCBC/(gamma**2.)]
+
+    if debug:
+        return log
+
     with mlflow.start_run():
         mlflow.set_tag('function', 'voting_record_test')
         mlflow.log_params(params)
+        for i in range(len(T)):
+            for ii in range(chis.shape[1]):
+                mlflow.log_metric('bias_%d'%ii, log['bias_%d'%ii][i], step=i)
+            mlflow.log_metric('trc', log['trc'][i], step=i)
+            mlflow.log_metric('trcbc', log['trcbc'][i], step=i)
+        return log
         # compute or load data
-        data_uri = load_voting_records()
-        gm = Graph_manager()
-        graph_params = {
-            'knn'   : params['knn'],
-            'sigma' : params['sigma'],
-            'Ltype' : params['Ltype'],
-            'n_eigs': params['n_eigs'],
-            'data_uri' : data_uri
-        }
-        # compute or load eigenvectors and eigenvalues
-        eigs = load_uri(gm.from_features(graph_params), 'eigs.npz')
-        w, v = eigs['w'], eigs['v']
-        # figure out groundtruth etc of disconnected graph
-        data = load_uri(data_uri, 'data.npz')
-        X, labels = data['X'], data['labels']
-        u = compute_groundtruth_u(X, labels, params)
-        num_fid = params['n_fid']
-        fid = {
-            1 : np.where(labels == 1)[0][:num_fid[1]],
-            -1: np.where(labels ==-1)[0][:num_fid[-1]]
-        }
-        lab_ind = list(fid[1])
-        lab_ind.extend(list(fid[-1]))
-        diag = np.zeros(X.shape[0])
-        diag[lab_ind] = 1.
-        B = sp.sparse.diags(diag, format='csr')
-        # compute statistics
-        # load parameters
-        alpha = params['alpha']
-        T = np.power(0.6, range(5, 20))
-        for i, tau in enumerate(T):
-            gamma = tau**alpha
-            d_inv = (tau ** (-2. * alpha)) * np.power(w + tau**2., alpha)
-            # prior_inv : C_{tau,eps}^{-1}, where
-            # C_{tau, eps}^{-1} = tau^{-2alpha}(L + tau^2 I)^alpha
-            prior_inv = v.dot(sp.sparse.diags(d_inv, format='csr').dot(v.T))
-            # B/gamma^2
-            B_over_gamma2 = B / (gamma**2.)
-            # post_inv  : (B/gamma^2 + C_{tau,\eps}^{-1})^{-1}
-            post_inv  = prior_inv + B_over_gamma2
-            # C^{-1}
-            post = sp.linalg.inv(post_inv)
-            bias = sp.linalg.norm(post.dot(prior_inv.dot(u)))
-            mlflow.log_metric('bias', bias ** 2, step=i)
-
-            # Calculate Tr(C)
-            mlflow.log_metric('trc', sp.trace(post), step=i)
-
-            # Calculate Tr(CBC)/gamma^2
-            post2 = post.dot(post)
-            trCBC = sp.trace(post2[np.ix_(lab_ind, lab_ind)])
-            mlflow.log_metric('trcbc', trCBC/(gamma**2.), step=i)
-
 
          
 
 
 
 if __name__ == "__main__":
+    mlflow.set_tracking_uri('http://0.0.0.0:8000')
     mlflow.set_experiment('voting-record')
     graph_params = {
         'knn'      : None,
@@ -119,10 +145,15 @@ if __name__ == "__main__":
         'n_eigs'   : None,
         'n_fid'    : {1:5, -1:5},
     }
-    ALPHAS = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3.]
-    SIGMAS = [0.5 * i for i in range(1,31)] 
+    ALPHAS = [0.5, 0.75, 1, 1.25, 2, 2.5, 3, 8, 16]
+    SIGMAS = [0.5 * i for i in range(1,62)]
+    total = len(ALPHAS) * len(SIGMAS)
+    i = 0
     for alpha in ALPHAS:
         for sigma in SIGMAS:
+            i += 1
+            print("{}/{}".format(i, total))
             graph_params['sigma'] = sigma
             graph_params['alpha'] = alpha
             voting_record_test(graph_params)
+
