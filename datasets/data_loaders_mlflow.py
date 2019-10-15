@@ -8,6 +8,10 @@ import mlflow
 import tempfile
 import numpy as np
 from util.mlflow_util import get_prev_run
+# for downloading MNIST
+import requests
+from io import BytesIO
+import gzip
 
 def load_voting_records(filepath='./datasets/VOTING-RECORD/', debug=False):
     if not debug:
@@ -55,25 +59,18 @@ def load_MNIST(params):
         digits:
         num_points
     """
-    digits = params['digits']
-    num_points = params['num_points']
-    print("Loading the MNIST data with digits %s ..." % str(digits))
-    if len(digits) != len(num_points):
-        raise ValueError('Length of digits and num_points must be the same')
 
     # filepath and filename creation for checking if this data has already been computed before
-    filename = "".join([str(d)+"_" for d in digits])
-    filename += "".join([str(n)+"_" for n in num_points])
-    filename += "%d_%s_%d.npz" % (num_eig, Ltype, k_nn)
-    file_path = "./datasets/MNIST/"
+    filepath  = "./datasets/MNIST/"
+    filename = "data.npz"
 
-    if not os.path.exists(file_path):
+    if not os.path.exists(filepath):
         print('Folder for MNIST not already created, creating...')
-        os.mkdir(file_path)
+        os.mkdir(filepath)
 
-    if os.path.isfile(file_path + filename):
+    if os.path.isfile(os.path.join(filepath, filename)):
         print('Found MNIST data already saved\n')
-        mnist = np.load(file_path+filename)
+        mnist = np.load(os.path.join(filepath, filename))
         X, evals, evecs, ground_truth = mnist['X'], mnist['evals'], mnist['evecs'], mnist['ground_truth']
         np.random.seed(seed) # set the random seed to allow for consistency in choosing fidelity point
         fid = {}
@@ -81,12 +78,10 @@ def load_MNIST(params):
             i_ind = np.where(ground_truth == i)[0]
             np.random.shuffle(i_ind)
             fid[i] = list(i_ind[:int(sup_percent*num_points[i])])
-
         del mnist
 
     else:
         print("Couldn't find already saved MNIST data for the given setup, downloading from http://yann.lecun.com/exdb/mnist/")
-
         """ Loading data from MNIST website"""
         resp = requests.get('http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz').content
         file = BytesIO(resp)
@@ -104,14 +99,6 @@ def load_MNIST(params):
         f.read(8)
         buf = f.read(num_images)
         labels = np.frombuffer(buf, dtype=np.uint8)
-
-        """ Processing to get the desired subset of digits"""
-        dig_ind = []
-        for j in range(len(digits)):
-            d_ind = np.where(labels == digits[j])[0]
-            np.random.shuffle(d_ind)
-            dig_ind.extend(list(d_ind[:num_points[j]]))
-
 
         """ Define fid, ground_truth, and X datums"""
         X = imgs[dig_ind, :]
