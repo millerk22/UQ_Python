@@ -315,7 +315,7 @@ def syn_plot_data(T, data, ALPHAS, param_str, title_=r'$\mathrm{Tr}(C^*)$', val_
             line_stats[i,:] = res.x
             print('The slope for alpha = %1.1f is : %2.4f' % (ALPHAS[i], res.x[0]))
 
-    markers = ['o','*', 'v', '^', '<', '>', '8', 's', 'p', 'h']
+    markers = ['o','*', 'v', '^', '>', 's', '<', 'p', 'h', 'o','*', 'v', '^', '>', 's', '<', 'p' ]
     fig = plt.figure()
     ax = fig.gca()
     ax.loglog(T, data.T)
@@ -363,10 +363,11 @@ def syn_plot_data_range(T, data, ALPHAS, param_str, file2save=None, t_ranges=Non
         file_string += '%1.1f, %2.4f\n' % (ALPHAS[i], res.x[0])
 
 
-    markers = ['o','*', 'v', '^', '>', 's', '<', 'p', 'h']
+    markers = ['o','*', 'v', '^', '>', 's', '<', 'p', 'h', 'o','*', 'v', '^', '>', 's', '<', 'p' ]
     #colors = ['b', 'r', 'g', 'purple', 'cyan', 'k','orange' , 'brown']
     prop_cycle = plt.rcParams['axes.prop_cycle']
     colors = prop_cycle.by_key()['color']
+    colors += prop_cycle.by_key()['color']
 
     fig = plt.figure()
     ax = fig.gca()
