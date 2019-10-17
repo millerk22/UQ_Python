@@ -243,6 +243,54 @@ def syn_run_test(T, ALPHAS, Ns, B, labeled, u, W_0, normalized=True, little_oh=F
     return TRC, TRCBC, BIAS
 
 
+def syn_run_test_new(T, ALPHAS, Ns, B, labeled, u, W_0, normalized=True, beta=-1, all_norms=False, seed=None):
+    """
+    Calculate a LOT of different values, now with the input being normalized.
+    """
+    TRC = np.zeros((len(ALPHAS), len(T)))
+    TRCBC = np.zeros((len(ALPHAS), len(T)))
+    BIAS = np.zeros((len(ALPHAS), len(T)))
+
+    u_n = u[:,0]/sp.linalg.norm(u[:,0])   # normalized vector for use in the BIAS calculation
+
+    if beta < 0:
+        w, v = get_eig_Lnorm(W_0, normed_=normalized)
+    # For each value of tau given in the list T
+    for j, tau in enumerate(T):
+        if beta >= 2.0:
+            eps = tau**beta
+            # Calculate the eigenvalues/vecs for this level of epsilon and tau value
+            w, v = get_eig_Lnorm_withW0(eps, Ns, W_0, normalized, seed)
+
+        for i,alpha in enumerate(ALPHAS):
+            gamma = tau**alpha
+            d_inv = (tau ** (-2. * alpha)) * np.power(w + tau**2., alpha)     # diagonalization of C_t,e - will be used later
+
+            # prior_inv : C_{tau,eps}^{-1}, where
+            # C_{tau, eps}^{-1} = tau^{-2alpha}(L + tau^2 I)^alpha
+            prior_inv = v.dot(sp.sparse.diags(d_inv, format='csr').dot(v.T))
+
+            # B/gamma^2
+            B_over_gamma2 = B / (gamma * gamma)
+            # post_inv  : (B/gamma^2 + C_{tau,\eps}^{-1})^{-1}
+            post_inv  = prior_inv + B_over_gamma2
+            # C^{-1}
+            post = post_inv.I
+            bias = sp.linalg.norm(post.dot(prior_inv.dot(u_n)))
+            BIAS[i,j] = bias**2.
+
+            # Calculate Tr(C)
+            trC = sp.trace(post)
+            TRC[i,j] = trC
+
+            # Calculate Tr(CBC)/gamma^2
+            post2 = post.dot(post)
+            trCBC = sp.trace(post2[np.ix_(labeled[0], labeled[0])])
+            TRCBC[i,j] = trCBC/(gamma**2.)
+
+    return TRC, TRCBC, BIAS
+
+
 def syn_run_test0(T, ALPHAS, Ns, B, labeled, u, W_0, normalized=True, seed=None):
     """
     Calculate a LOT of different values, now with the input being normalized.
@@ -291,6 +339,110 @@ def syn_run_test0(T, ALPHAS, Ns, B, labeled, u, W_0, normalized=True, seed=None)
 
     return TRC, TRCBC, BIAS
 
+
+def syn_run_test_gamma(G, ALPHAS, Ns, B, labeled, u, W_0, normalized=True, beta=-1, seed=None):
+    """
+    Calculate a LOT of different values, now with the input being normalized.
+    """
+    TRC = np.zeros((len(ALPHAS), len(G)))
+    TRCBC = np.zeros((len(ALPHAS), len(G)))
+    BIAS = np.zeros((len(ALPHAS), len(G)))
+
+    u_n = u[:,0]/sp.linalg.norm(u[:,0])   # normalized vector for use in the BIAS calculation
+
+    if beta < 0:
+        w, v = get_eig_Lnorm(W_0, normed_=normalized)
+
+    # For each value of tau given in the list T
+    for i,alpha in enumerate(ALPHAS):
+        for j, gamma in enumerate(G):
+
+            tau = gamma**(1./alpha)# Calculate the eigenvalues/vecs for this level of epsilon and tau value
+            print(alpha, gamma, tau)
+            if beta > 0:
+                eps = tau**beta
+                w, v = get_eig_Lnorm_withW0(eps, Ns, W_0, normalized, seed)
+
+
+            d_inv = (tau ** (-2. * alpha)) * np.power(w + tau**2., alpha)     # diagonalization of C_t,e - will be used later
+
+            # prior_inv : C_{tau,eps}^{-1}, where
+            # C_{tau, eps}^{-1} = tau^{-2alpha}(L + tau^2 I)^alpha
+            prior_inv = v.dot(sp.sparse.diags(d_inv, format='csr').dot(v.T))
+
+            # B/gamma^2
+            B_over_gamma2 = B / (gamma * gamma)
+            # post_inv  : (B/gamma^2 + C_{tau,\eps}^{-1})^{-1}
+            post_inv  = prior_inv + B_over_gamma2
+            # C^{-1}
+            post = post_inv.I
+            bias = sp.linalg.norm(post.dot(prior_inv.dot(u_n)))
+            BIAS[i,j] = bias**2.
+
+            # Calculate Tr(C)
+            trC = sp.trace(post)
+            TRC[i,j] = trC
+
+            # Calculate Tr(CBC)/gamma^2
+            post2 = post.dot(post)
+            trCBC = sp.trace(post2[np.ix_(labeled[0], labeled[0])])
+            TRCBC[i,j] = trCBC/(gamma**2.)
+
+    return TRC, TRCBC, BIAS
+
+
+def syn_run_test0_gamma(T, ALPHAS, Ns, B, labeled, u, W_0, normalized=True, seed=None):
+    """
+    Calculate a LOT of different values, now with the input being normalized.
+    """
+    TRC = np.zeros((len(ALPHAS), len(T)))
+    TRCBC = np.zeros((len(ALPHAS), len(T)))
+    BIAS = np.zeros((len(ALPHAS), len(T)))
+
+    K = len(Ns)
+    N = sum(Ns)
+    u_n = u[:,0]/sp.linalg.norm(u[:,0])   # normalized vector for use in the BIAS calculation
+
+    w, v = get_eig_Lnorm(W_0, normed_=normalized)
+
+
+    # For each value of tau given in the list T
+    for j, tau in enumerate(T):
+        for i,alpha in enumerate(ALPHAS):
+            d_inv = (tau ** (-2. * alpha)) * np.power(w + tau**2., alpha)     # diagonalization of C_t,0 - will be used later
+
+            # prior_inv : C_{tau,0}^{-1}, where
+            # C_{tau, 0}^{-1} = tau^{-2alpha}(L + tau^2 I)^alpha
+            prior_inv = v.dot(sp.sparse.diags(d_inv, format='csr').dot(v.T))
+
+            gamma = tau**alpha
+
+            # B/gamma^2
+            B_over_gamma2 = B / (gamma * gamma)
+            # post_inv  : (B/gamma^2 + C_{tau,\eps}^{-1})^{-1}
+            post_inv  = prior_inv + B_over_gamma2
+            # C^{-1}
+            post = post_inv.I
+            bias = sp.linalg.norm(post.dot(prior_inv.dot(u_n)))
+            BIAS[i,j] = bias**2.
+
+            # Calculate Tr(C)
+            trC = sp.trace(post)
+            TRC[i,j] = trC
+
+            # Calculate Tr(CBC)/gamma^2
+            post2 = post.dot(post)
+            trCBC = sp.trace(post2[np.ix_(labeled[0], labeled[0])])
+            TRCBC[i,j] = trCBC/(gamma**2.)
+
+    return TRC, TRCBC, BIAS
+
+
+
+
+
+
+
 """ Plotting Code """
 
 def syn_plot_data(T, data, ALPHAS, param_str, title_=r'$\mathrm{Tr}(C^*)$', val_str="TRC", save=False, Jval=-1, _fontsize=25, little_oh=False):
@@ -334,6 +486,76 @@ def syn_plot_data(T, data, ALPHAS, param_str, title_=r'$\mathrm{Tr}(C^*)$', val_
             plt.title(title_ + r', $\epsilon = \tau^3, \gamma = \tau^\alpha$', fontsize=15)
         else:
             plt.title(title_ + r', $\epsilon = \tau^2, \gamma = \tau^\alpha$', fontsize=15)
+    plt.show()
+
+    return
+
+
+def syn_plot_data_gamma(T, data, ALPHAS, param_str, file2save=None, t_ranges=None, plot_ranges=None,title_=r'$\mathrm{Tr}(C^*)$', val_str="TRC", save=False, Jval=-1, _fontsize=25, beta=-1, legend=False):
+    """
+        Generic plotting function for showing values contained in the matrix ``data``
+        and title given in the input string ``title_``.
+
+        If want to fit the the line, input value Jval >= 0. (the index where to start)
+    """
+    file_string = param_str + '_'+ val_str+ '\nalpha,slope (in terms of gamma exponent)\n'
+    n_tau = len(T)
+    n_alpha = len(ALPHAS)
+    if t_ranges is None:
+        t_ranges = [(0,n_tau) for i in range(n_alpha)]
+    if plot_ranges is None:
+        plot_ranges = n_alpha*[(0,n_tau)]
+
+
+    # Fit the line for T[J[i]:], data[i,:]
+    print('Line fitting for %s' % val_str)
+    line_stats = np.zeros((n_alpha,2))
+    for i in range(n_alpha):
+        j_start, j_end = t_ranges[i]
+        t = np.log(T[j_start:j_end])
+        A = np.array([t, np.ones(len(t))]).T
+        b = np.log(data[i,j_start:j_end])
+        res = lsq_linear(A, b)
+        line_stats[i,:] = res.x
+        print('The slope (in terms of gamma) for alpha = %1.1f is : %2.4f' % (ALPHAS[i], res.x[0]/ALPHAS[i]))
+        #print('The slope (in terms of gamma) for alpha = %1.1f is : %2.4f' % (ALPHAS[i], res.x[0]))
+        file_string += '%1.1f, %2.4f\n' % (ALPHAS[i], res.x[0]/ALPHAS[i])
+
+    markers = ['o','*', 'v', '^', '>', 's', '<', 'p', 'h', 'o','*', 'v', '^', '>', 's', '<', 'p' ]
+    prop_cycle = plt.rcParams['axes.prop_cycle']
+    colors = prop_cycle.by_key()['color']
+    colors += prop_cycle.by_key()['color']
+
+    fig = plt.figure()
+    ax = fig.gca()
+
+    for i, alpha in enumerate(ALPHAS):
+        j_start, j_end = plot_ranges[i]
+        ax.loglog(T[j_start:j_end], data[i,j_start:j_end], c=colors[i])
+        ax.scatter(T[j_start:j_end], data[i,j_start:j_end], marker=markers[i], c=colors[i], label=r'$\alpha =$ %2.1f'% alpha)
+    plt.xlabel(r'$\tau=\gamma^{1/\alpha}$', fontsize=_fontsize)
+    plt.ylabel(title_, fontsize=_fontsize)
+    ax.tick_params(axis='both', which='major', labelsize=_fontsize)
+    if legend:
+        plt.legend(fontsize=15)
+    plt.tight_layout()
+    if save:
+        if save:
+            if file2save is None:
+                print("Saving figure at ./figures/BPCpaper/%s_%s.png" % (param_str, val_str))
+                plt.savefig('./figures/BPCpaper/%s_%s.png' % (param_str, val_str))
+                with open('./figures/BPCpaper/%s_%s.txt' % (param_str, val_str), 'w') as file:
+                    file.write(file_string)
+            else:
+                print("Saving figure at %s%s_%s.png" % (file2save, param_str, val_str))
+                plt.savefig('%s%s_%s.png' % (file2save, param_str, val_str))
+                with open('%s%s_%s.txt' % (file2save, param_str, val_str), 'w') as file:
+                    file.write(file_string)
+    else:
+        if beta < 0:
+            plt.title(title_ + r', $\epsilon = 0, \tau = \gamma^\alpha$', fontsize=15)
+        else:
+            plt.title(title_ + r', $\epsilon = \gamma^{%d/\alpha}, \tau = \gamma^\alpha$' % beta, fontsize=15)
     plt.show()
 
     return
