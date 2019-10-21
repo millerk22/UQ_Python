@@ -14,4 +14,8 @@ mnist_data.mat
 INPUT.md
 **/svgs
 .ipynb_checkpoints
+**/figures/BPCpaper/
+**/figures/BPCpaper_rand1
+**/figures/BPCpaper_rand1_2
 
+cr_tau.png
