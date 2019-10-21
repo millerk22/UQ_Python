@@ -13,3 +13,5 @@ mnist_data.mat
 **LaplacianEvals/
 INPUT.md
 **/svgs
+**/figures/BPCpaper_rand1*
+/.ipynb_checkpoints/
