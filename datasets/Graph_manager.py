@@ -9,9 +9,7 @@ import mlflow
 
 class Graph_manager(object):
     """
-    Instantiated from a Data_obj (features) or generate synthetic data
-    Stores relavent parameters of generating similarity graphs from a given
-    Data_obj or generating synthetic network
+    Mostly Graph methods
 
     Necessary Fields:
     self.param
@@ -24,8 +22,7 @@ class Graph_manager(object):
     self.eigenvectors
     """
 
-    def __init__(self, N=None):
-        self.N = N
+    def __init__(self):
         return
 
     def __del__(self):
@@ -65,7 +62,7 @@ class Graph_manager(object):
         """
         load from features using params
         params:
-            data_uri
+            X 
             knn
             sigma
             Ltype
@@ -76,13 +73,13 @@ class Graph_manager(object):
                                     params, None)
             if prev_run is not None:
                 print('Found previous eigs')
-                return os.path.join(prev_run.info.artifact_uri, 'eigs.npz')
-
+                eigs = load_uri(os.path.join(prev_run.info.artifact_uri,
+                                'eigs.npz'))
+                return eigs['w'], eigs['v'] 
 
         print('Compute eigs')
-        data = load_uri(params['data_uri'])
-        self.N = len(data['X'])
-        A = self.sqdist(data['X'].T, data['X'].T)
+        X = params['X']
+        A = self.sqdist(X.T, X.T)
         A = self.compute_similarity_graph(
             distance_mat = A, 
             knn          = params['knn'],
@@ -91,16 +88,15 @@ class Graph_manager(object):
             Ltype = params['Ltype'])
         w, v = self.compute_spectrum(A, n_eigs=params['n_eigs'])
 
-        np.savez('./eigs.npz', w=w, v=v)
-
         if debug:
-            return './eigs.npz'
+            return w, v
 
         with mlflow.start_run(nested=True):
+            np.savez('./eigs.npz', w=w, v=v)
             mlflow.set_tag('function', 'Graph_manager.from_features')
             mlflow.log_params(params)
             mlflow.log_artifact('./eigs.npz')
-            return os.path.join(mlflow.get_artifact_uri(), 'eigs.npz')
+            return w, v
 
     def sqdist(self, X, Y):
         """
@@ -118,14 +114,15 @@ class Graph_manager(object):
         Computes similarity graph using parameters specified in self.param 
         """
         # Probably we want to set all default parameters in one place
+        N = distance_mat.shape[0]
         if knn is None:
-            knn = self.N - 1
+            knn = N - 1
         ind_knn = np.argsort(distance_mat, axis=1)[:, 1:knn+1]
-        Dknn = distance_mat[(np.arange(self.N).reshape(self.N,1),ind_knn)]
-        I = np.tile(np.arange(self.N).reshape(self.N,1), (1,knn)).flatten()
+        Dknn = distance_mat[(np.arange(N).reshape(N,1),ind_knn)]
+        I = np.tile(np.arange(N).reshape(N,1), (1,knn)).flatten()
         J = ind_knn.flatten()
         Dknn = np.exp(-Dknn/sigma)
-        W = sps.csr_matrix((Dknn.flatten() , (I, J)), shape=(self.N, self.N))
+        W = sps.csr_matrix((Dknn.flatten() , (I, J)), shape=(N, N))
         W = 0.5*(W+W.T)
         return W
 
@@ -143,9 +140,10 @@ class Graph_manager(object):
         """
         Computes first n_eigs smallest eigenvalues and eigenvectors
         """
+        N = L.shape[0]
         if n_eigs is None:
-            n_eigs = self.N
-        if n_eigs > int(self.N/2):
+            n_eigs = N
+        if n_eigs > int(N/2):
             w, v = sla.eigh(L.toarray(), eigvals=(0,n_eigs-1))
         else:
             w, v = sps.linalg.eigsh(L, k=n_eigs, which='SM')

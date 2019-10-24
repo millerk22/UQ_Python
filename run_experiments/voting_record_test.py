@@ -59,21 +59,18 @@ def voting_record_test(params, debug=False):
             return 
 
 
-    data_uri = load_voting_records(debug=debug)
+    X, labels = load_voting_records()
     gm = Graph_manager()
     graph_params = {
         'knn'   : params['knn'],
         'sigma' : params['sigma'],
         'Ltype' : params['Ltype'],
         'n_eigs': params['n_eigs'],
-        'data_uri' : data_uri
+        'X' : X
     }
     # compute or load eigenvectors and eigenvalues
-    eigs = load_uri(gm.from_features(graph_params, debug=debug))
-    w, v = eigs['w'], eigs['v']
+    w, v = gm.from_features(graph_params, debug=debug)
     # figure out groundtruth etc of disconnected graph
-    data = load_uri(data_uri)
-    X, labels = data['X'], data['labels']
 
     chis = compute_groundtruth_u(X, labels, params)
     num_fid = params['n_fid']
