@@ -68,6 +68,7 @@ class Graph_manager(object):
             sigma
             Ltype
             n_eigs
+            zp_k
         """
         if not debug:
             prev_run = get_prev_run('Graph_manager.from_features', 
@@ -120,6 +121,7 @@ class Graph_manager(object):
         N = len(X) 
         if knn is None:
             knn = N 
+
         if knn > N / 2:
             nn = NearestNeighbors(n_neighbors=knn, algorithm='brute').fit(X)
         else:
@@ -133,9 +135,9 @@ class Graph_manager(object):
         A_data, A_ind = nn.kneighbors(X, knn, return_distance=True)
 
         if zp_k is not None:
-            k_dist = A_data[:,zp_k]
+            k_dist = A_data[:,zp_k][:,np.newaxis]
             k_dist[k_dist == 0] = 1 
-            A_data /= (k_dist * k_dist[A_ind])
+            A_data /= (k_dist * k_dist[A_ind,0])
  
         A_data = np.ravel(A_data)
         W = sps.csr_matrix((np.exp(-A_data ** 2/sigma),
