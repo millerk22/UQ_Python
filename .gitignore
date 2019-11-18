@@ -14,4 +14,5 @@ mnist_data.mat
 INPUT.md
 **/svgs
 .ipynb_checkpoints
+**/figures
 

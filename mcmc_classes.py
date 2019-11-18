@@ -97,6 +97,8 @@ class MCMC_Sampler(object):
     def active_learning_choices(self, method, num_to_label):
         pass
 
+
+
     def plot_u(self, u):
         """ Note this plotting assumes that the input u is 1D numpy array. So,
         if our problem is multiclass, you must be passing only one column to this
