@@ -100,7 +100,12 @@ class MCMC_Sampler(object):
             raise ValueError('Method %s not implemented. Please choose from:\n%s' % (method, AL_METHODS))
 
         if method == 'us-entropy':
-            ent = self.u
+            if hasattr(self, 'u_mean'):
+                ent = sum(self.u_mean * np.log(self.u_mean), axis=1)
+                
+            else:
+                raise ValueError("This sampler has not been run yet, cannot choose query points until after sampling...")
+
 
 
     def plot_u(self, u):
