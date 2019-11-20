@@ -33,6 +33,27 @@ def test2moons(show_plot=False, run_ipy=False):
 
     return
 
+
+def test2moonsAL(show_plot=False, run_ipy=False):
+    print("Running 2 moons test of MCMC sampler, Gaussian Regression")
+    # load the 2 moons data, plot initial distribution of labeled and unlabeled
+    data = load_2_moons()
+    if show_plot:
+        data.plot_initial()
+
+
+    # Create the GR sampler, default params : gamma = 0.001, tau = 0.01, alpha = 1.0
+    GR_sampler = Gaussian_Regression_Sampler()
+    GR_sampler.load_data(data)
+
+    # Get 100 samples (i.e. calculate the posterior mean and covariance, then sample)
+    GR_sampler.run_sampler(10000)
+
+    b, bs = 200, 10
+    print("Total Budget for AL samples = %d, done in batches of size = %d" % (b,bs))
+    for it in range(b//bs):
+        
+
 def testG3_GR(show_plot=False, run_ipy=False):
     print("Running Gaussian Cluster test of MCMC sampler, Gaussian Regression")
     # load Gaussian Clusters data, plot initial distribution of labeled and unlabeled

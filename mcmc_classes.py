@@ -99,12 +99,44 @@ class MCMC_Sampler(object):
         if method not in AL_METHODS:
             raise ValueError('Method %s not implemented. Please choose from:\n%s' % (method, AL_METHODS))
 
+        if not hasattr(self, 'u_mean'):
+            raise ValueError("This sampler has not been run yet, cannot choose query points until after sampling...")
+
+
+        '''
+            Binary classification for entropy and least-confident reduces to comparing the "distance" to the decision threshold (i.e. margin).
+            That is,
+                argmax Entropy(x_i)  <==> argmin |u_i - d_threshold|
+
+            Currently just not accounting for ignoring indices of labeled points, since assumed to be far away from
+            the decision boundary.
+        '''
+
         if method == 'us-entropy':
-            if hasattr(self, 'u_mean'):
-                ent = sum(self.u_mean * np.log(self.u_mean), axis=1)
-                
-            else:
-                raise ValueError("This sampler has not been run yet, cannot choose query points until after sampling...")
+            if -1 in self.Data.classes: # classes -1, 1
+                return np.argsort(np.abs(self.u_mean))[:num_to_label]
+            elif 0 in self.Data.classes and len(self.u_mean.shape) == 1: # classes 0, 1
+                return np.argsort(np.abs(self.u_mean - 0.5))[:num_to_label]
+            else: # multiclass case --> softmax on rows of matrix
+                u_mean_prob = np.exp(self.u_mean)
+                u_mean_prob /= np.sum(u_mean_prob, axis=1)[:, np.newaxis]
+                ents = np.sum(u_mean_prob*np.log(u_mean_prob), axis=1)
+                return np.argsort(ents)[:num_to_label]
+
+        if method == 'us-lc': # 'Least-Confident' --> take difference of 1st and 2nd "best" computed labels' probabilities
+            if -1 in self.Data.classes: # classes -1, 1
+                return np.argsort(np.abs(self.u_mean))[:num_to_label]
+            elif 0 in self.Data.classes and len(self.u_mean.shape) == 1: # classes 0, 1
+                return np.argsort(np.abs(self.u_mean - 0.5))[:num_to_label]
+            else: # multiclass case --> can just look at difference between best 2 computed labels' values in u_mean
+                u_mean_sort = -np.sort(-self.u_mean, axis=1)
+                diffs = u_mean_sort[:,0] - u_mean_sort[:,1]
+                return np.argsort(diffs)[:num_to_label]
+
+    def update_model(self, choices):
+        # Add the current choices of indices to the labeled set and update the model
+        return
+
 
 
 
@@ -212,6 +244,12 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
             m_t = threshold2D(self.m, False)
         self.acc_m = len(np.where(m_t == self.Data.ground_truth)[0])/self.Data.N
         return self.acc_u, self.acc_u_t
+
+    def update_model(self, choices):
+        MCMC_Sampler.update_model(self, choices)
+
+        # Update model via batch update
+        pass 
 
 
 
