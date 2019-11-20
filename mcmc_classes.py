@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from util.util import calc_GR_posterior, threshold1D, threshold2D
 from util.util import threshold2D_avg, threshold1D_avg, SummaryStats
+from util.al_util import *
 import scipy.sparse as sps
 from scipy.linalg import eigh
 from scipy.stats import norm
@@ -246,10 +247,20 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
         return self.acc_u, self.acc_u_t
 
     def update_model(self, choices):
+        # Currently should work for multiclass...
         MCMC_Sampler.update_model(self, choices)
 
+        # Query "oracle"
+        class_ind_ks = self.Data.ground_truth[choices]
+
         # Update model via batch update
-        pass 
+        self.m, self.C, self.y, self.Data.labeled = calc_next_C_and_m_batch_multi(self.m, self.C, self.y,
+                                                    self.Data.labeled, choices, class_ind_ks, self.gamma2)
+        for ind in range(len(choices)):
+            self.Data.unlabeled.remove(choices[ind])
+            self.Data.fid[class_ind_ks[ind]].append(choices[ind])
+
+        return
 
 
 
