@@ -6,12 +6,12 @@ import scipy.sparse as sps
 import scipy.linalg as sla
 import os
 import mlflow
+from sklearn.neighbors import NearestNeighbors
+
 
 class Graph_manager(object):
     """
-    Instantiated from a Data_obj (features) or generate synthetic data
-    Stores relavent parameters of generating similarity graphs from a given
-    Data_obj or generating synthetic network
+    Mostly Graph methods
 
     Necessary Fields:
     self.param
@@ -24,8 +24,7 @@ class Graph_manager(object):
     self.eigenvectors
     """
 
-    def __init__(self, N=None):
-        self.N = N
+    def __init__(self):
         return
 
     def __del__(self):
@@ -61,46 +60,47 @@ class Graph_manager(object):
         pass
 
     # Only for Data_obj
-    def from_features(self, params, debug=False):
+    def from_features(self, X, params, debug=False):
         """
         load from features using params
         params:
-            data_uri
             knn
             sigma
             Ltype
             n_eigs
+            zp_k
         """
         if not debug:
             prev_run = get_prev_run('Graph_manager.from_features', 
-                                    params, None)
+                                    params, 
+                                    tags={"X":str(X)}, 
+                                    git_commit=None)
             if prev_run is not None:
                 print('Found previous eigs')
-                return os.path.join(prev_run.info.artifact_uri, 'eigs.npz')
+                eigs = load_uri(os.path.join(prev_run.info.artifact_uri,
+                                'eigs.npz'))
+                return eigs['w'], eigs['v'] 
 
-
-        print('Compute eigs')
-        data = load_uri(params['data_uri'])
-        self.N = len(data['X'])
-        A = self.sqdist(data['X'].T, data['X'].T)
-        A = self.compute_similarity_graph(
-            distance_mat = A, 
+        print('Compute eigs from scratch')
+        W = self.compute_similarity_graph(
+            X            = X, 
             knn          = params['knn'],
-            sigma        = params['sigma'])
-        A = self.compute_laplacian(A,
+            sigma        = params['sigma'],
+            zp_k         = params['zp_k'])
+        A = self.compute_laplacian(W,
             Ltype = params['Ltype'])
         w, v = self.compute_spectrum(A, n_eigs=params['n_eigs'])
 
-        np.savez('./eigs.npz', w=w, v=v)
-
         if debug:
-            return './eigs.npz'
+            return w, v
 
         with mlflow.start_run(nested=True):
+            np.savez('./eigs.npz', w=w, v=v)
             mlflow.set_tag('function', 'Graph_manager.from_features')
+            mlflow.set_tag('X', str(X))
             mlflow.log_params(params)
             mlflow.log_artifact('./eigs.npz')
-            return os.path.join(mlflow.get_artifact_uri(), 'eigs.npz')
+            return w, v
 
     def sqdist(self, X, Y):
         """
@@ -113,20 +113,38 @@ class Graph_manager(object):
         YY = np.sum(Yt*Yt, axis=1).reshape(n, 1)
         return np.tile(XX, (n, 1)) + np.tile(YY, (1, m)) - 2*Yt.dot(X)
 
-    def compute_similarity_graph(self, distance_mat, knn, sigma):
+    def compute_similarity_graph(self, X, knn, sigma=1, zp_k=None):
         """
         Computes similarity graph using parameters specified in self.param 
         """
         # Probably we want to set all default parameters in one place
+        N = len(X) 
         if knn is None:
-            knn = self.N - 1
-        ind_knn = np.argsort(distance_mat, axis=1)[:, 1:knn+1]
-        Dknn = distance_mat[(np.arange(self.N).reshape(self.N,1),ind_knn)]
-        I = np.tile(np.arange(self.N).reshape(self.N,1), (1,knn)).flatten()
-        J = ind_knn.flatten()
-        Dknn = np.exp(-Dknn/sigma)
-        W = sps.csr_matrix((Dknn.flatten() , (I, J)), shape=(self.N, self.N))
-        W = 0.5*(W+W.T)
+            knn = N 
+
+        if knn > N / 2:
+            nn = NearestNeighbors(n_neighbors=knn, algorithm='brute').fit(X)
+        else:
+            nn = NearestNeighbors(n_neighbors=knn, algorithm='ball_tree').fit(X)
+
+        # modify from the kneighbors_graph function from sklearn to 
+        # accomodate Zelnik-Perona scaling
+        n_nonzero = N * knn
+        A_indptr = np.arange(0, n_nonzero + 1, knn)
+        # construct CSR matrix representation of the k-NN graph
+        A_data, A_ind = nn.kneighbors(X, knn, return_distance=True)
+
+        if zp_k is not None:
+            k_dist = A_data[:,zp_k][:,np.newaxis]
+            k_dist[k_dist == 0] = 1 
+            A_data /= (k_dist * k_dist[A_ind,0])
+ 
+        A_data = np.ravel(A_data)
+        W = sps.csr_matrix((np.exp(-A_data ** 2/sigma),
+                            A_ind.ravel(), 
+                            A_indptr),
+                            shape=(N, N))
+        W = (W + W.T)/2
         return W
 
     def compute_laplacian(self, W, Ltype):
@@ -136,16 +154,17 @@ class Graph_manager(object):
         if Ltype == 'normed':
             L = sps.csgraph.laplacian(W, normed=True)
         else:
-            print('not implemented!')
+            L = sps.csgraph.laplacian(W, normed=False)
         return L
 
     def compute_spectrum(self, L, n_eigs):
         """
         Computes first n_eigs smallest eigenvalues and eigenvectors
         """
+        N = L.shape[0]
         if n_eigs is None:
-            n_eigs = self.N
-        if n_eigs > int(self.N/2):
+            n_eigs = N
+        if n_eigs > int(N/2):
             w, v = sla.eigh(L.toarray(), eigvals=(0,n_eigs-1))
         else:
             w, v = sps.linalg.eigsh(L, k=n_eigs, which='SM')

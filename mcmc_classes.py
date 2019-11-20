@@ -10,6 +10,7 @@ import time
 import matlab.engine
 from datasets.trnm import TruncRandNormMulticlass
 
+AL_METHODS = ['us-entropy', 'us-lc']
 
 class MCMC_Sampler(object):
     """ Base MCMC Sampler object. The different classes that inherit from this base
@@ -95,7 +96,17 @@ class MCMC_Sampler(object):
 
 
     def active_learning_choices(self, method, num_to_label):
-        pass
+        if method not in AL_METHODS:
+            raise ValueError('Method %s not implemented. Please choose from:\n%s' % (method, AL_METHODS))
+
+        if method == 'us-entropy':
+            if hasattr(self, 'u_mean'):
+                ent = sum(self.u_mean * np.log(self.u_mean), axis=1)
+                
+            else:
+                raise ValueError("This sampler has not been run yet, cannot choose query points until after sampling...")
+
+
 
     def plot_u(self, u):
         """ Note this plotting assumes that the input u is 1D numpy array. So,

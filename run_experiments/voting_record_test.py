@@ -9,12 +9,11 @@ def compute_groundtruth_u(X, labels, params):
     sigma = params['sigma']
     knn = params['knn']
     Ltype = params['Ltype']
-
-    gm = Graph_manager(N = X.shape[0])
-    A  = gm.sqdist(X.T, X.T)
+    zp_k = params['zp_k']
+    gm = Graph_manager()
     pos = np.where(labels == 1)[0]
     neg = np.where(labels == -1)[0]
-    W = gm.compute_similarity_graph(A, knn, sigma) 
+    W = gm.compute_similarity_graph(X, knn, sigma, zp_k) 
     W[np.ix_(pos, neg)] = 0
     W[np.ix_(neg, pos)] = 0
     D = np.array(np.sqrt(np.sum(W, axis=1))).flatten()  # sqrt of the degrees
@@ -43,6 +42,7 @@ def voting_record_test(params, debug=False):
     params:
         knn
         sigma
+        zp_k
         Ltype
         n_eigs
         ------------
@@ -59,27 +59,23 @@ def voting_record_test(params, debug=False):
             return 
 
 
-    data_uri = load_voting_records(debug=debug)
+    X, labels = load_voting_records()
     gm = Graph_manager()
     graph_params = {
         'knn'   : params['knn'],
         'sigma' : params['sigma'],
+        'zp_k'  : params['zp_k'],
         'Ltype' : params['Ltype'],
         'n_eigs': params['n_eigs'],
-        'data_uri' : data_uri
     }
     # compute or load eigenvectors and eigenvalues
-    eigs = load_uri(gm.from_features(graph_params, debug=debug))
-    w, v = eigs['w'], eigs['v']
+    w, v = gm.from_features(X, graph_params, debug=debug)
     # figure out groundtruth etc of disconnected graph
-    data = load_uri(data_uri)
-    X, labels = data['X'], data['labels']
-
     chis = compute_groundtruth_u(X, labels, params)
-    num_fid = params['n_fid']
+    n_fid = params['n_fid']
     fid = {
-        1 : np.where(labels == 1)[0][:num_fid[1]],
-        -1: np.where(labels ==-1)[0][:num_fid[-1]]
+        1 : np.where(labels == 1)[0][:n_fid[1]],
+        -1: np.where(labels ==-1)[0][:n_fid[-1]]
     }
     lab_ind = list(fid[1])
     lab_ind.extend(list(fid[-1]))
@@ -119,7 +115,6 @@ def voting_record_test(params, debug=False):
 
     if debug:
         return log
-
     with mlflow.start_run():
         mlflow.set_tag('function', 'voting_record_test')
         mlflow.log_params(params)
@@ -136,11 +131,12 @@ def voting_record_test(params, debug=False):
 
 
 if __name__ == "__main__":
-    mlflow.set_tracking_uri('http://0.0.0.0:8000')
-    mlflow.set_experiment('voting-record')
-    graph_params = {
+    # mlflow.set_tracking_uri('http://0.0.0.0:8000')
+    # mlflow.set_experiment('voting-record')
+    params = {
         'knn'      : None,
-        'sigma'    : 1.3,
+        'sigma'    : 1.0,
+        'zp_k'     : 7,
         'Ltype'    : 'normed',
         'n_eigs'   : None,
         'n_fid'    : {1:5, -1:5},
@@ -153,7 +149,7 @@ if __name__ == "__main__":
         for sigma in SIGMAS:
             i += 1
             print("{}/{}".format(i, total))
-            graph_params['sigma'] = sigma
-            graph_params['alpha'] = alpha
-            voting_record_test(graph_params)
+            params['sigma'] = sigma
+            params['alpha'] = alpha
+            voting_record_test(params, debug=False)
 
