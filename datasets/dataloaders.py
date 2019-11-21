@@ -352,8 +352,8 @@ def load_CITESEER(filepath='./datasets/CITESEER/', Ltype='n', num_eig=None, sup_
     return Data_obj(None, evals, evecs, fid, ground_truth)
 
 
-def load_voting_records(filepath='./datasets/VOTING-RECORD/', 
-                        Ltype='n', num_eig=None, 
+def load_voting_records(filepath='./datasets/VOTING-RECORD/',
+                        Ltype='n', num_eig=None,
                         sup_percent=0.1, seed=1):
     filename = 'house-votes-84.data'
     # load the file directly into X format
@@ -385,7 +385,7 @@ def load_voting_records(filepath='./datasets/VOTING-RECORD/',
         evals, evecs = get_eig_Lnorm(W, num_eig=num_eig, normed_=False)
     # WIP
     return Data_obj(X, evals, evecs, fid, labels)
-    
+
 
 ################# Graph generation and other calculations ######################
 

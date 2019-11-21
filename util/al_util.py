@@ -300,8 +300,8 @@ def calc_orig_multi(v, w, fid, labeled, unlabeled, tau, alpha, gamma2):
             y[fid_c,c-ofs] = 1    # TODO: make it sparse
 
     N_prime = len(labeled)
-    #w_inv = (tau ** (2 * alpha)) * np.power(w + tau**2., -alpha)     # diagonalization of C_t,e
-    w_inv =  np.power(w + tau**2., -alpha)     # diagonalization of C_t,e
+    w_inv = (tau ** (2 * alpha)) * np.power(w + tau**2., -alpha)     # diagonalization of C_t,e
+    #w_inv =  np.power(w + tau**2., -alpha)     # diagonalization of C_t,e
     C_tau = v.dot((v*w_inv).T)
     C_ll = C_tau[np.ix_(labeled, labeled)]
     C_all_l = C_tau[:,labeled]
@@ -309,6 +309,7 @@ def calc_orig_multi(v, w, fid, labeled, unlabeled, tau, alpha, gamma2):
     A_inv = sla.inv(C_ll)
     Block1 = C_all_l.dot(A_inv)
     C = C_tau - Block1.dot(C_all_l.T)
+
     m = Block1.dot(y[labeled])
     if -1 in fid.keys():
         m = np.asarray(m).flatten()
@@ -382,7 +383,6 @@ def run_next_VS_multi(m, C, y, labeled, unlabeled, fid, ground_truth, gamma2, me
         ckk = ck[k_next]
         C_next -= (1./(gamma2 + ckk))*np.outer(ck,ck)
 
-
     if -1 in fid.keys():
         # Ask "the oracle" for values of the k in k_to_add value known from ground truth
         y_ks = [ground_truth[k] for k in k_to_add]
@@ -409,6 +409,7 @@ def run_next_VS_multi(m, C, y, labeled, unlabeled, fid, ground_truth, gamma2, me
     # update fid
     for k in k_to_add:
         fid[ground_truth[k]].append(k)
+
 
 
     return m_next, C_next, y_next, labeled, unlabeled, fid, k_to_add
@@ -453,6 +454,8 @@ def run_test_AL_VS_multi(X, v, w, fid, ground_truth, method='S', tag2=(0.01, 1.0
     # Initial solution - find m and C, keep track of y
     tic = time.clock()
     m, C, y = calc_orig_multi(v, w, fid, labeled, unlabeled, tau, alpha, gamma2)
+
+
     toc = time.clock()
     if verbose:
         print('calc_orig_multi took %f seconds' % (toc -tic))
@@ -470,6 +473,7 @@ def run_test_AL_VS_multi(X, v, w, fid, ground_truth, method='S', tag2=(0.01, 1.0
     # structure to record the m vectors calculated at each iteration
     M = {}
     M[-1] = m
+
 
     # AL choices - done in a batch
     for l in range(num_batches):
