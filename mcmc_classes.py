@@ -247,18 +247,29 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
         return self.acc_u, self.acc_u_t
 
     def update_model(self, choices):
-        # Currently should work for multiclass...
         MCMC_Sampler.update_model(self, choices)
 
-        # Query "oracle"
-        class_ind_ks = self.Data.ground_truth[choices]
-
         # Update model via batch update
-        self.m, self.C, self.y, self.Data.labeled = calc_next_C_and_m_batch_multi(self.m, self.C, self.y,
+        if -1 in self.fid.keys():
+            # Query "oracle"
+            y_ks = self.Data.ground_truth[choices]
+            self.m= calc_next_m_batch(self.m, self.C, self.y, self.Data.labeled,
+                                                    choices, y_ks, self.gamma2)
+            self.Data.labeled.extend(choices)
+            self.y[choices] = y_ks
+
+        else:
+            ofs = min(list(self.Data.fid.keys()))
+            class_ind_ks = [self.Data.ground_truth[k]-ofs for k in choices]
+
+            self.m, self.y, self.Data.labeled = calc_next_m_batch_multi(self.m, self.C, self.y,
                                                     self.Data.labeled, choices, class_ind_ks, self.gamma2)
-        for ind in range(len(choices)):
-            self.Data.unlabeled.remove(choices[ind])
-            self.Data.fid[class_ind_ks[ind]].append(choices[ind])
+
+        # Now update posterior C, unlabeled, and fid
+        for i in range(len(choices)):
+            self.Data.unlabeled.remove(choices[i])
+            self.Data.fid[class_ind_ks[i]].append(choices[i])
+            self.C -= (1./(self.gamma2 + self.C[choices[i], choices[i]]))* np.outer(self.C[:,choices[i]], self.C[:,choices[i]])
 
         return
 
