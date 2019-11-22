@@ -5,7 +5,6 @@ import sys
 sys.path.append('..')
 import os
 import numpy as np
-# for download MNIST
 from io import BytesIO
 import gzip
 import requests
