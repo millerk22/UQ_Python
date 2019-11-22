@@ -134,6 +134,7 @@ class MCMC_Sampler(object):
                 diffs = u_mean_sort[:,0] - u_mean_sort[:,1]
                 return np.argsort(diffs)[:num_to_label]
 
+
     def update_model(self, choices):
         # Add the current choices of indices to the labeled set and update the model
         return
