@@ -136,11 +136,11 @@ class Graph_manager(object):
 
         if zp_k is not None:
             k_dist = A_data[:,zp_k][:,np.newaxis]
-            k_dist[k_dist == 0] = 1 
-            A_data /= (k_dist * k_dist[A_ind,0])
- 
+            k_dist[k_dist < 1e-4] = 1e-4 
+            A_data /= np.sqrt(k_dist * k_dist[A_ind,0])
+
         A_data = np.ravel(A_data)
-        W = sps.csr_matrix((np.exp(-A_data ** 2/sigma),
+        W = sps.csr_matrix((np.exp(-(A_data ** 2)/sigma),
                             A_ind.ravel(), 
                             A_indptr),
                             shape=(N, N))
