@@ -121,7 +121,7 @@ class Data_obj(object):
 
 
 
-def load_2_moons(N=2000, noise=0.2, sup_percent=0.05, normed_lap=False, num_eig=None, seed=None, zero_one=False):
+def load_2_moons(N=2000, noise=0.2, sup_percent=0.05, normed_lap=False, num_eig=None, seed=None, zero_one=False, knn=5, sigma=1.):
     print("Loading the 2 moons data with %d total points..." % N)
     # call the sklearn function for making moons data
     X, ground_truth = make_moons(n_samples=N, noise=noise, random_state=seed)
@@ -142,7 +142,7 @@ def load_2_moons(N=2000, noise=0.2, sup_percent=0.05, normed_lap=False, num_eig=
         fid[i] = list(i_mask[:int(sup_percent*n_i)])
 
     # Graph Generation and Eigen-Calculation
-    W = make_sim_graph(X)
+    W = make_sim_graph(X, k_nn=knn, sigma=sigma)
     evals, evecs = get_eig_Lnorm(W, num_eig=num_eig, normed_=normed_lap)
 
     return Data_obj(X, evals, evecs, fid, ground_truth)
@@ -401,7 +401,7 @@ def sqdist(X, Y):
     return np.tile(XX, (n,1)) + np.tile(YY, (1,m)) - 2*Yt.dot(X)
 
 # Make the similarity graph from rows of X
-def make_sim_graph(X, k_nn=5):
+def make_sim_graph(X, k_nn=5, sigma=1.):
     N = X.shape[0]
     # Make weighted similarity graph, in W
     D = sqdist(X.T,X.T)
@@ -412,7 +412,7 @@ def make_sim_graph(X, k_nn=5):
     J = ind_knn.flatten()
     Dmean = (np.sum(Dknn, axis=1)/k_nn).reshape(N,1)
     w_sp = np.divide(Dknn, Dmean)
-    w_sp = np.exp(-(w_sp * w_sp)/3.)
+    w_sp = np.exp(-(w_sp * w_sp)/sigma)
     W = sps.csr_matrix((w_sp.flatten() , (I, J)), shape=(N,N))
     W = 0.5*(W+W.T)
 

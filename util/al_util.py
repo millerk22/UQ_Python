@@ -315,6 +315,7 @@ def calc_orig_multi(v, w, fid, labeled, unlabeled, tau, alpha, gamma2):
         m = np.asarray(m).flatten()
     else:
         m = np.asarray(m)
+    
     return m, np.asarray(C), y
 
 
@@ -343,13 +344,23 @@ def run_next_EEM(m, C, y, lab, unlab, fid, ground_truth, gamma2, verbose=False, 
     lab.append(k_next)
     unlab.remove(k_next)
 
-
+    print(np.allclose(m_next, (C_next @ y)/gamma2))
     return k_next, m_next, C_next, y, lab, unlab, fid
 
-def V_opt(C, unlabeled, gamma2):
+def V_opt(C, unlabeled, gamma2, show=False, X=None):
     ips = np.array([np.inner(C[k,:], C[k,:]) for k in unlabeled]).flatten()
     v_opt = ips/(gamma2 + np.diag(C)[unlabeled])
     k_max = unlabeled[np.argmax(v_opt)]
+
+    # plot if show and have data to plot
+    if show and X is not None:
+        v_opt = (v_opt - min(v_opt))/(max(v_opt) - min(v_opt))
+        colors = [(x, 0.5,(1-x)) for x in v_opt]
+        plt.scatter(X[unlabeled, 0],X[unlabeled,1], c=colors)
+        plt.scatter(X[k_max,0], X[k_max,1], c='g', marker='^', s=200)
+        plt.title('Vopt - choosing %d' % k_max)
+        plt.show()
+
     return k_max
 
 def Sigma_opt(C, unlabeled, gamma2):
@@ -360,12 +371,14 @@ def Sigma_opt(C, unlabeled, gamma2):
     return k_max
 
 
-def run_next_VS_multi(m, C, y, labeled, unlabeled, fid, ground_truth, gamma2, method='S', batch_size=5, verbose=False):
+def run_next_VS_multi(m, C, y, labeled, unlabeled, fid, ground_truth, gamma2, method='S', batch_size=5, verbose=False, X=None):
     k_to_add = []
     C_next = C.copy()
     for i in range(batch_size):
         tic = time.clock()
         if method == 'V':
+            if verbose and X is not None:
+                k_next = V_opt(C_next, unlabeled, gamma2, True, X)
             k_next = V_opt(C_next, unlabeled, gamma2)
         elif method == 'S':
             k_next = Sigma_opt(C_next, unlabeled, gamma2)
@@ -411,7 +424,6 @@ def run_next_VS_multi(m, C, y, labeled, unlabeled, fid, ground_truth, gamma2, me
         fid[ground_truth[k]].append(k)
 
 
-
     return m_next, C_next, y_next, labeled, unlabeled, fid, k_to_add
 
 
@@ -455,7 +467,6 @@ def run_test_AL_VS_multi(X, v, w, fid, ground_truth, method='S', tag2=(0.01, 1.0
     tic = time.clock()
     m, C, y = calc_orig_multi(v, w, fid, labeled, unlabeled, tau, alpha, gamma2)
 
-
     toc = time.clock()
     if verbose:
         print('calc_orig_multi took %f seconds' % (toc -tic))
@@ -478,7 +489,7 @@ def run_test_AL_VS_multi(X, v, w, fid, ground_truth, method='S', tag2=(0.01, 1.0
     # AL choices - done in a batch
     for l in range(num_batches):
         m, C, y, labeled, unlabeled, fid, k_added = run_next_VS_multi(m, C, y, labeled,
-                            unlabeled, fid, ground_truth, gamma2, method, batch_size, verbose)
+                            unlabeled, fid, ground_truth, gamma2, method, batch_size, verbose, X=X)
         error, stats_obj = calc_stats_multi(m, fid, gt_flipped)
         ERRS.append((k_added,error))
         M[l] = m
@@ -710,10 +721,12 @@ def plot_risk_smoothness_and_m(X, C, m, y, labeled, unlabeled, org_indices, gamm
     plt.subplot(1,2,2)
     lin = [i for i in range(N)]
     plt.scatter(lin, get_probs(m[org_indices]))
+    #plt.scatter(lin, m[org_indices])
     plt.plot(lin, N*[0.5], 'r--')
     plt.title(r'$m$ probabilities')
     plt.show()
     return
+
 
 def plot_m(X, m):
     N = X.shape[0]
