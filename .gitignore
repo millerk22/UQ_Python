@@ -18,4 +18,4 @@ mlruns/
 *.npz
 mlruns-db/
 notebook_scripts/V-opt.ipynb
-
+notebook_scripts/MNIST_V_opt.ipynb
