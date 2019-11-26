@@ -96,7 +96,7 @@ class MCMC_Sampler(object):
         return
 
 
-    def active_learning_choices(self, method, num_to_label):
+    def uncertainty_sampling(self, method, num_to_label):
         if method not in AL_METHODS:
             raise ValueError('Method %s not implemented. Please choose from:\n%s' % (method, AL_METHODS))
 
@@ -109,35 +109,30 @@ class MCMC_Sampler(object):
             That is,
                 argmax Entropy(x_i)  <==> argmin |u_i - d_threshold|
 
-            Currently just not accounting for ignoring indices of labeled points, since assumed to be far away from
-            the decision boundary.
         '''
 
         if method == 'us-entropy':
             if -1 in self.Data.classes: # classes -1, 1
-                return np.argsort(np.abs(self.u_mean))[:num_to_label]
+                choices = np.argsort(np.abs(self.u_mean[self.Data.unlabeled]))[:num_to_label]
             elif 0 in self.Data.classes and len(self.u_mean.shape) == 1: # classes 0, 1
-                return np.argsort(np.abs(self.u_mean - 0.5))[:num_to_label]
+                choices = np.argsort(np.abs(self.u_mean[self.Data.unlabeled] - 0.5))[:num_to_label]
             else: # multiclass case --> softmax on rows of matrix
-                u_mean_prob = np.exp(self.u_mean)
+                u_mean_prob = np.exp(self.u_mean[self.Data.unlabeled])
                 u_mean_prob /= np.sum(u_mean_prob, axis=1)[:, np.newaxis]
                 ents = np.sum(u_mean_prob*np.log(u_mean_prob), axis=1)
-                return np.argsort(ents)[:num_to_label]
+                choices = np.argsort(ents)[:num_to_label]
 
         if method == 'us-lc': # 'Least-Confident' --> take difference of 1st and 2nd "best" computed labels' probabilities
             if -1 in self.Data.classes: # classes -1, 1
-                return np.argsort(np.abs(self.u_mean))[:num_to_label]
+                choices = np.argsort(np.abs(self.u_mean[self.Data.unlabeled]))[:num_to_label]
             elif 0 in self.Data.classes and len(self.u_mean.shape) == 1: # classes 0, 1
-                return np.argsort(np.abs(self.u_mean - 0.5))[:num_to_label]
+                choices = np.argsort(np.abs(self.u_mean[self.Data.unlabeled] - 0.5))[:num_to_label]
             else: # multiclass case --> can just look at difference between best 2 computed labels' values in u_mean
-                u_mean_sort = -np.sort(-self.u_mean, axis=1)
+                u_mean_sort = -np.sort(-self.u_mean[self.Data.unlabeled], axis=1)
                 diffs = u_mean_sort[:,0] - u_mean_sort[:,1]
-                return np.argsort(diffs)[:num_to_label]
+                choices = np.argsort(diffs)[:num_to_label]
 
-
-    def update_model(self, choices):
-        # Add the current choices of indices to the labeled set and update the model
-        return
+        return [self.Data.unlabeled[i] for i in choices]
 
 
 
@@ -147,8 +142,11 @@ class MCMC_Sampler(object):
         if our problem is multiclass, you must be passing only one column to this
         plotting function.
         """
-        plt.scatter(np.arange(self.Data.N), u)
-        plt.scatter(self.Data.labeled, u[self.Data.labeled], c='g')
+        u_sorted = np.array([])
+        for c in self.Data.classes:
+            u_sorted = np.hstack((u_sorted, u[self.Data.ground_truth == c]))
+        plt.scatter(np.arange(self.Data.N), u_sorted)
+        #plt.scatter(self.Data.labeled, u[self.Data.labeled], c='g')
         plt.title('Plot of u')
         plt.show()
 
@@ -190,7 +188,7 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
         MCMC_Sampler.load_data(self, Data, plot_)
 
 
-    def run_sampler(self, num_samples, f='thresh'):
+    def run_sampler(self, num_samples, f='thresh', empirical_samples=False):
         """
         Run MCMC sampling for the loaded dataset.
         Inputs:
@@ -198,6 +196,9 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
                 (Note for GR here no burnIn needed)
             f : str 'thresh' or function handle, samples will compute values related to
                 E[f(u)].
+            empirical_samples : bool -- whether or not to actually generate empirical samples
+                from this model. Gaussian regression mean/mode has closed form, so not necessary to
+                calculate empirical samples. default : True
 
         Outputs:
             Saves to the Sampler object:
@@ -216,48 +217,65 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
         ## run Gaussian Regression method here -- ignoring burnIn
         self.m, self.C, self.y = calc_GR_posterior(self.Data.evecs, self.Data.evals, self.Data.fid,
                                 self.Data.labeled, self.Data.unlabeled, self.tau, self.alpha, self.gamma2)
-
-        # binary class case
-        if -1 in self.Data.classes:
-            samples = np.random.multivariate_normal(self.m, self.C, num_samples).T
-            self.u_mean = np.average(samples, axis=1)
-            if f == 'thresh':
-                self.u_t_mean = threshold1D_avg(samples)
-
-        # multiclass sampling case
+        self.plot_u(self.m)
+        if not empirical_samples:
+            self.u_mean = self.m
+            if -1 in self.Data.classes:
+                if f == 'thresh':
+                    self.u_t_mean = threshold1D(self.u_mean)
+            else:
+                if f == 'thresh':
+                    self.u_t_mean = threshold2D(self.u_mean)
         else:
-            samples = np.array([np.random.multivariate_normal(self.m[:,i], self.C,
-                            self.num_samples).T for i in range(self.Data.num_class)]).transpose((1,0,2))
-            self.u_mean = np.average(samples, axis=2)
-            if f == 'thresh':
-                self.u_t_mean = threshold2D_avg(samples)
+            # binary class case
+            if -1 in self.Data.classes:
+                samples = np.random.multivariate_normal(self.m, self.C, num_samples).T
+                self.u_mean = np.average(samples, axis=1)
+                if f == 'thresh':
+                    self.u_t_mean = threshold1D_avg(samples)
 
-        # delete the samples for sake of memory
-        del samples
+            # multiclass sampling case
+            else:
+                samples = np.array([np.random.multivariate_normal(self.m[:,i], self.C,
+                                self.num_samples).T for i in range(self.Data.num_class)]).transpose((1,0,2))
+                self.u_mean = np.average(samples, axis=2)
+                if f == 'thresh':
+                    self.u_t_mean = threshold2D_avg(samples)
+
+            # delete the samples for sake of memory
+            del samples
         return
 
-    def comp_mcmc_stats(self):
-        self.acc_u, self.acc_u_t = MCMC_Sampler.comp_mcmc_stats(self)
+
+    def comp_mcmc_stats(self, return_acc=True):
+        self.acc_u, self.acc_u_t = MCMC_Sampler.comp_mcmc_stats(self, return_acc)
         """ In addition to the stats from the sampling from the posterior, calculate
         accuracy of thresholded analytic posterior mean, threshold*D(self.m)"""
         if -1 in self.Data.fid.keys():
-            m_t = threshold1D(self.m)
+            m_t = threshold1D(self.m.copy())
         else:
-            m_t = threshold2D(self.m, False)
+            m_t = threshold2D(self.m.copy(), False)
         self.acc_m = len(np.where(m_t == self.Data.ground_truth)[0])/self.Data.N
         return self.acc_u, self.acc_u_t
 
     def update_model(self, choices):
-        MCMC_Sampler.update_model(self, choices)
+        #MCMC_Sampler.update_model(self, choices)
 
         # Update model via batch update
-        if -1 in self.fid.keys():
+        if -1 in self.Data.fid.keys():
             # Query "oracle"
             y_ks = self.Data.ground_truth[choices]
             self.m= calc_next_m_batch(self.m, self.C, self.y, self.Data.labeled,
                                                     choices, y_ks, self.gamma2)
             self.Data.labeled.extend(choices)
             self.y[choices] = y_ks
+
+            # Now update posterior C, unlabeled, and fid
+            for i in range(len(choices)):
+                self.Data.unlabeled.remove(choices[i])
+                self.Data.fid[y_ks[i]].append(choices[i])
+                self.C -= (1./(self.gamma2 + self.C[choices[i], choices[i]])) * \
+                                    np.outer(self.C[:,choices[i]], self.C[:,choices[i]])
 
         else:
             ofs = min(list(self.Data.fid.keys()))
@@ -266,11 +284,12 @@ class Gaussian_Regression_Sampler(MCMC_Sampler):
             self.m, self.y, self.Data.labeled = calc_next_m_batch_multi(self.m, self.C, self.y,
                                                     self.Data.labeled, choices, class_ind_ks, self.gamma2)
 
-        # Now update posterior C, unlabeled, and fid
-        for i in range(len(choices)):
-            self.Data.unlabeled.remove(choices[i])
-            self.Data.fid[class_ind_ks[i]].append(choices[i])
-            self.C -= (1./(self.gamma2 + self.C[choices[i], choices[i]]))* np.outer(self.C[:,choices[i]], self.C[:,choices[i]])
+            # Now update posterior C, unlabeled, and fid
+            for i in range(len(choices)):
+                self.Data.unlabeled.remove(choices[i])
+                self.Data.fid[class_ind_ks[i]].append(choices[i])
+                self.C -= (1./(self.gamma2 + self.C[choices[i], choices[i]])) * \
+                                    np.outer(self.C[:,choices[i]], self.C[:,choices[i]])
 
         return
 

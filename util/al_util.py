@@ -63,22 +63,6 @@ def calc_next_m_batch(m, C, y, lab, k_to_add, y_ks, gamma2):
     m_next -= (1./gamma2)*C_b.dot(C_bb_inv.dot(C_b[lab_new,:].T.dot(y_next[lab_new])))
     return m_next
 
-'''
-def calc_next_C_and_m_batch(m, C, y, lab, k_to_add, y_ks, gamma2):
-    Cb = C[:,k_to_add]
-    mat_inv = sla.inv(gamma2*np.eye(len(k_to_add)) + Cb[k_to_add,:])
-    C -= Cb.dot(mat_inv.dot(Cb.T))
-
-    # Update m now
-    lab_new = lab[:]
-    lab_new.extend(k_to_add)
-    y_next = y.copy()
-    y_next[k_to_add] = y_ks
-    m_batch = (1./gamma2)*C[:,lab_new].dot(y_next[lab_new])
-
-    return m_batch, C
-'''
-
 
 def calc_next_m_batch_multi(m, C, y, lab, k_to_add, class_ind_ks, gamma2):
     C_b = C[:, k_to_add]
@@ -118,7 +102,7 @@ def get_probs(m,sigmoid=True):
 
 
 # Transform the matrix m into probabilities, while still respecting the threshold
-def get_probs_multi(m, softmax=False):
+def get_probs_multi(m, softmax=True):
     if m.size == m.shape[0]:
         return get_probs(m, softmax)
 

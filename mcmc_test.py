@@ -46,13 +46,32 @@ def test2moonsAL(show_plot=False, run_ipy=False):
     GR_sampler = Gaussian_Regression_Sampler()
     GR_sampler.load_data(data)
 
-    # Get 100 samples (i.e. calculate the posterior mean and covariance, then sample)
-    GR_sampler.run_sampler(10000)
+    # Get 1000 samples (i.e. calculate the posterior mean and covariance, then sample)
+    GR_sampler.run_sampler(1000)
 
     b, bs = 200, 10
     print("Total Budget for AL samples = %d, done in batches of size = %d" % (b,bs))
+
+
+    GR_sampler.plot_u(GR_sampler.m)
+    acc, acc_t = GR_sampler.comp_mcmc_stats(True)
+    ACC, ACC_t = [acc], [acc_t]
+
     for it in range(b//bs):
-        
+        to_query = GR_sampler.uncertainty_sampling('us-entropy',bs)
+        GR_sampler.update_model(to_query)
+        print(np.sum(np.abs(GR_sampler.y)))
+        acc, acc_t = GR_sampler.comp_mcmc_stats(True)
+        print('Batch %d' % (it+1))
+        GR_sampler.plot_u(GR_sampler.m)
+        ACC.append(acc)
+        ACC_t.append(acc_t)
+
+    plt.plot([i*bs for i in range(len(ACC))], ACC, 'b--', label='m')
+    plt.plot([i*bs for i in range(len(ACC_t))], ACC_t, 'g--', label='m thresh')
+    plt.title('Convergence Comparison - Entropy US-AL')
+    plt.show()
+
 
 def testG3_GR(show_plot=False, run_ipy=False):
     print("Running Gaussian Cluster test of MCMC sampler, Gaussian Regression")
@@ -300,11 +319,4 @@ if __name__ == "__main__":
 
 
 
-    #test2moons(show_plot, run_ipy)
-    #testG3_GR(show_plot, run_ipy)
-    #testG3_GPS(show_plot, run_ipy)
-    testMNIST(run_ipy)
-    #test_pCn(run_ipy)
-    #test_pCn2(run_ipy)
-    #test_GProb2(run_ipy)
-    #test_HUJI(run_ipy)
+    test2moonsAL()
