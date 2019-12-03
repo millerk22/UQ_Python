@@ -6,9 +6,7 @@ from util.al_util import *
 import scipy.sparse as sps
 from scipy.linalg import eigh
 from scipy.stats import norm
-import emcee
 import time
-import matlab.engine
 from datasets.trnm import TruncRandNormMulticlass
 
 AL_METHODS = ['us-entropy', 'us-lc']
@@ -46,6 +44,7 @@ class MCMC_Sampler(object):
         self.sum_stats = SummaryStats()
         self.sum_stats_t = SummaryStats()
         self.name = "MCMC"
+        self.u_mean = None
 
     def load_data(self, Data, plot_=False):
         self.Data = Data

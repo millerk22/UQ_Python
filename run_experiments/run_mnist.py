@@ -19,5 +19,5 @@ if __name__ == '__main__':
         'zp_k' : 7,
         'n_eigs': 100
     }
-    w, v = gm.from_features(X, graph_params, debug=False)
+    w, v = gm.from_features(X, graph_params, debug=True)
     print(w.shape, v.shape)
