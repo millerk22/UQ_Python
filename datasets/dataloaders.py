@@ -124,8 +124,8 @@ class Data_obj(object):
 def load_2_moons(N=2000, noise=0.2, sup_percent=0.05, normed_lap=False, num_eig=None, seed=None, zero_one=False, knn=5, sigma=1.):
     print("Loading the 2 moons data with %d total points..." % N)
     # call the sklearn function for making moons data
-    X, ground_truth = make_moons(n_samples=N, noise=noise, random_state=seed)
-
+    #X, ground_truth = make_moons(n_samples=N, noise=noise, random_state=seed, shuffle=False)
+    X, ground_truth = make_moons(n_samples=N, noise=noise, shuffle=False)
     # if want +1, -1 classes, change the corresponding entries
     if not zero_one:
         ground_truth[np.where(ground_truth == 0)] = -1
