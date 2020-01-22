@@ -315,7 +315,7 @@ def calc_orig_multi(v, w, fid, labeled, unlabeled, tau, alpha, gamma2):
         m = np.asarray(m).flatten()
     else:
         m = np.asarray(m)
-    
+
     return m, np.asarray(C), y
 
 
@@ -354,11 +354,13 @@ def V_opt(C, unlabeled, gamma2, show=False, X=None):
 
     # plot if show and have data to plot
     if show and X is not None:
+        mv, Mv = min(v_opt), max(v_opt)
         v_opt = (v_opt - min(v_opt))/(max(v_opt) - min(v_opt))
         colors = [(x, 0.5,(1-x)) for x in v_opt]
         plt.scatter(X[unlabeled, 0],X[unlabeled,1], c=colors)
         plt.scatter(X[k_max,0], X[k_max,1], c='g', marker='^', s=200)
         plt.title('Vopt - choosing %d' % k_max)
+        plt.annotate(xy=(-1.5,1.5), s='%1.5f, %1.5f' % (mv, Mv))
         plt.show()
 
     return k_max
@@ -493,6 +495,7 @@ def run_test_AL_VS_multi(X, v, w, fid, ground_truth, method='S', tag2=(0.01, 1.0
         error, stats_obj = calc_stats_multi(m, fid, gt_flipped)
         ERRS.append((k_added,error))
         M[l] = m
+
         if verbose:
             print('Iter = %d' % (l + 1))
             if -1 in fid.keys():
