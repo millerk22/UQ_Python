@@ -10,8 +10,8 @@ class Gibbs_probit_sampler(MCMC):
     def sample(self, n_samples, u0 = None, save_samples=False):
         """
         generate additional n_samples
-        
-        u0 : initial sample
+        u0 : initial sample, use u0 if provided otherwise use the last stored
+             sample or a random sample
         save_samples: whether or not we should save the samples
         """
         # if we have previous samples, we use the last sample
@@ -34,25 +34,24 @@ class Gibbs_probit_sampler(MCMC):
         z_all = np.random.randn(len(self.w), self.n_classes, n_samples)
 
         # Compute the projections for use in the KL expansion for sampling u | v
-
         V_KJ = self.v[labeled,:]
         P_KJ = V_KJ.T.dot(V_KJ)/self.gamma2
         for i in range(len(self.w)):
             P_KJ[i,i] += self.w[i]
-        #P_KJ = 0.5*(P_KJ + P_KJ.T)  # do we need? seems to be symmetric already...
+
         S_KJ, Q_KJ = eigh(P_KJ)
         inv_skj = 1./np.sqrt(S_KJ)[:,np.newaxis]
-
 
         # Main iterations
         for i in range(n_samples):
             if  i % 1000 == 0:
                 print('\tIteration %d of sampling...' % k)
-            z_k = z_all[:,:,i] # the white noise samples for use in sampling u | v
+            # the white noise samples for use in sampling u | v
+            z_k = z_all[:,:,i] 
             # Sample v ~ P(v | u).
             v = []
             for c, ind in self.fid.items():
-                v += self.TRNM.gen_samples(u[ind, :], self.gamma)
+                v += self.TRNM.gen_samples(u[ind, :], self.gamma, c)
             v = np.vstack(v)
 
             # Sample u ~ P(u | v) via KL expansion
@@ -62,7 +61,6 @@ class Gibbs_probit_sampler(MCMC):
             m_hat = Q_KJ.dot(temp)
             u_hat = Q_KJ.dot(z_k * inv_skj) + m_hat
             u = self.v.dot(u_hat)
-
 
             # If past the burn in period, calculate the updates to the means we're recording
             if save_samples:
