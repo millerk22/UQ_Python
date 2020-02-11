@@ -6,7 +6,6 @@ from scipy.optimize import lsq_linear
 import scipy.linalg as sla
 import numpy as np 
 import matplotlib.pyplot as plt
-from util.plotutil import *
 from itertools import product
 from scipy.optimize import newton, root_scalar
 from mpl_toolkits.mplot3d import Axes3D
@@ -52,7 +51,7 @@ def compute_laplacian(W):
 # Main setup, defining the node set, fidelity nodes, ground truth u and observations y, and corresponding
 # B and H matrices
 
-def overall_setup(rand=False,Ns=[100,100,100],num_in_each=5):  
+def overall_setup(rand=False, Ns=[100,100,100], num_in_each=5):  
     N = sum(Ns)
 
     # begin with ground truth, u
