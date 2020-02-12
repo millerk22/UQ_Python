@@ -693,7 +693,7 @@ def plot_risk_smoothness(X, C, m, y, labeled, unlabeled, gamma2):
     m_probs = get_probs_multi(m)
     risks = [calc_risk(j, m, C, y, labeled, unlabeled, m_probs, gamma2) for j in range(N)]
     #risks2 = [calc_risk_full(j, m, C, y, labeled, unlabeled, m_probs, gamma2) for j in range(N)]
-    imax,imin = np.argmax(risks), np.argmax(risks)
+    imax,imin = np.argmax(risks), np.argmin(risks)
     val = (risks - min(risks))/(max(risks) - min(risks))
     colors = [(x, 0.5,(1-x)) for x in val]
     plt.scatter(X[:,0],X[:,1], c=colors)

@@ -305,6 +305,107 @@ class Gibbs_Probit_Sampler(MCMC_Sampler):
 
 
 
+class Gibbs_Probit_Sampler_record(MCMC_Sampler):
+    """
+    Probit Likelihood model:
+    Phi(u; y, gamma) = - log(Psi(u_j(1) y_j(1); gamma)) - log(Psi(u_j(1) y_j(1); gamma))
+                        ... -log(Psi(u_j(N') y_j(N'); gamma))
+        where Psi(v; gamma) is CDF of normal distribution with standard deviation gamma
+        and j(i) is the ith labeled node.
+
+    Gibbs sampling iterates between sampling from truncated normal distributions
+    on the labeled set, and Karhuenen-Loeve expansion for sampling based on the prior.
+    """
+    def __init__(self, gamma=0.01, tau=0.01, alpha=1.):
+        MCMC_Sampler.__init__(self, gamma, tau, alpha)
+        self.name = "Gaussian_Probit"
+
+    def load_data(self, Data, plot_=False):
+        MCMC_Sampler.load_data(self, Data, plot_)
+        if -1 in self.Data.fid.keys():
+            print("Noticed you gave Gibbs-Probit classes with -1. Converting to 0 for the current implementation...")
+            self.Data.fid[0] = self.Data.fid[-1]
+            del self.Data.fid[-1]
+            self.Data.ground_truth[self.Data.ground_truth == -1] = 0.
+            self.Data.classes = [0,1]
+        # initiate the trandn_multiclass object
+        self.TRNM = TruncRandNormMulticlass(self.Data.num_class)
+
+
+    def run_sampler(self, num_samples, burnIn=0, f='thresh', seed=None):
+        MCMC_Sampler.run_sampler(self, num_samples, burnIn)
+        print("Running Gibbs-Probit sampling to get %d samples, with %d burnIn samples" % (num_samples, burnIn))
+
+        # instantiate the u_mean (unthresh), u_t_mean (unthres) variables
+        self.u_mean = np.zeros((self.Data.N, self.Data.num_class))
+        self.u_t_mean = np.zeros_like(self.u_mean)
+
+        # fixed initialization of u.
+        u = np.zeros_like(self.u_mean)
+
+        # fidv contains the indices of the fidelity nodes in the list "labeled"
+        fidv = {}
+        for c, ind in self.Data.fid.items():
+            u[np.ix_(ind, len(ind)*[c])] = 1.
+            fidv[c] = [self.Data.labeled.index(j) for j in ind]
+
+
+        # sample Gaussian noise in batch to begin
+        np.random.seed(seed)
+        z_all = np.random.randn(len(self.Data.evals), self.Data.num_class, num_samples+burnIn)
+
+        # Compute the projections for use in the KL expansion for sampling u | v
+
+        V_KJ = self.Data.evecs[self.Data.labeled,:]
+        P_KJ = V_KJ.T.dot(V_KJ)/self.gamma2
+        for i in range(len(self.evals_mod)):
+            P_KJ[i,i] += self.evals_mod[i]
+        #P_KJ = 0.5*(P_KJ + P_KJ.T)  # do we need? seems to be symmetric already...
+        S_KJ, Q_KJ = eigh(P_KJ)
+        inv_skj = 1./np.sqrt(S_KJ)[:,np.newaxis]
+
+
+        # Main iterations
+        self.U = []
+        for k in range(burnIn + num_samples):
+            if self.print_ and k % 500 == 0:
+                print('\tIteration %d of sampling...' % k)
+            z_k = z_all[:,:,k] # the white noise samples for use in sampling u | v
+
+            # Sample v ~ P(v | u).
+            v = np.zeros((len(self.Data.labeled), self.Data.num_class))
+            for cl, ind_cl in self.Data.fid.items():
+                v[fidv[cl],:] = self.TRNM.gen_samples(u[ind_cl,:], self.gamma, cl)
+
+
+            # Sample u ~ P(u | v) via KL expansion
+            temp = V_KJ.T.dot(v)/self.gamma2
+            temp = Q_KJ.T.dot(temp)
+            temp /= S_KJ[:,np.newaxis]
+            m_hat = Q_KJ.dot(temp)
+            u_hat = Q_KJ.dot(z_k * inv_skj) + m_hat
+            u = self.Data.evecs.dot(u_hat)
+
+
+            # If past the burn in period, calculate the updates to the means we're recording
+            if k > burnIn:
+                self.U.append(u)
+                k_rec = k - burnIn
+                if k_rec == 1:
+                    self.u_mean = u
+                    if f == 'thresh':
+                        self.u_t_mean = threshold2D(u.copy())
+                else:
+                    self.u_mean = ((k_rec-1) * self.u_mean + u)/k_rec
+                    if f == 'thresh':
+                        self.u_t_mean = ((k_rec-1) * self.u_t_mean + threshold2D(u.copy()))/k_rec
+
+        return
+
+
+
+
+
 
 
 class pCN_Probit_Sampler(MCMC_Sampler):
@@ -393,6 +494,104 @@ class pCN_Probit_Sampler(MCMC_Sampler):
                     self.u_mean = ((k_rec) * self.u_mean + u)/(k_rec + 1)
                     if f == 'thresh':
                         self.u_t_mean = ((k_rec) * self.u_t_mean + threshold1D(u.copy()))/(k_rec+1)
+
+
+
+class pCN_Probit_Sampler_record(MCMC_Sampler):
+    """
+    Probit Likelihood model:
+        Phi(u; y, gamma) = - log(Psi(u_j(1) y_j(1); gamma)) - log(Psi(u_j(1) y_j(1); gamma))
+                        ... -log(Psi(u_j(N') y_j(N'); gamma))
+            where Psi(v; gamma) is CDF of normal distribution with standard deviation gamma
+            and j(i) is the ith labeled node.
+
+    pCN (pre-conditioned Crank Nicholson) is MH-inspired sampler that produces proposal
+    steps by:
+        w^k = sqrt(1 - beta^2)w^k + beta z^k,   z^k ~ N(0, L^(-1))
+    with acceptance probability:
+        a(v,w) = min( 1 , Phi(v; y, gamma) - Phi(w; y, gamma) )
+
+    **** NOTE this is currently only written for Binary classification! ****
+    """
+    def __init__(self, beta, gamma=0.1, tau=0., alpha=1.):
+        MCMC_Sampler.__init__(self, gamma, tau, alpha)
+        self.name = "pCN_Probit"
+        self.beta = beta
+
+    def load_data(self, Data, plot_=False):
+        MCMC_Sampler.load_data(self, Data, plot_)
+        if max(self.Data.fid.keys()) > 1:
+            raise NotImplementedError("Multiclass sampling for pCN Probit is not yet implemented")
+
+        # self.y has ordering as given in variable self.labeled
+        ofs = min(self.Data.fid.keys())
+        self.y = np.ones(len(self.Data.labeled))
+        mask = [np.where(self.Data.labeled == v)[0] for v in self.Data.fid[ofs]]
+        self.y[mask] = ofs
+
+
+    def run_sampler(self, num_samples, burnIn=0, f='thresh', seed=None):
+        MCMC_Sampler.run_sampler(self, num_samples, burnIn)
+        print("Running pCN Probit sampling to get %d samples, with %d burnIn samples" % (num_samples, burnIn))
+        norm_rv = norm(scale=self.gamma)  # normal rv for generating the cdf values
+
+        # Helper functions for running the MH sampling
+        def log_like(x):
+            return -np.sum(np.log(norm_rv.cdf(x * self.y)))
+
+        def alpha(u, w):
+            u_, w_ = u[self.Data.labeled], w[self.Data.labeled]
+
+            return np.min([1., np.exp(log_like(u_) - log_like(w_))])
+
+        # Sample Gaussian noise in batch
+        np.random.seed(seed)
+        if self.tau > 0:
+            KL_scaled_evecs =  self.Data.evecs * self.evals_mod**-0.5
+            z = np.random.randn(self.evals_mod.shape[0], num_samples+burnIn)
+        else:
+            KL_scaled_evecs =  self.Data.evecs[:,1:] * self.evals_mod[1:]**-0.5
+            z = np.random.randn(self.evals_mod.shape[0]-1, num_samples+burnIn)
+
+        # instantiate sample
+        u = np.ones(self.Data.N, dtype=np.float32)*np.average(list(self.Data.fid.keys()))
+        for v in self.Data.fid.keys():
+            u[self.Data.fid[v]] = v
+
+        self.u_samples = []
+
+
+
+        # Main iterations
+        num_acc = 0
+        for k in range(burnIn + num_samples):
+            if self.print_ and k % 500 == 0:
+                print('\tIteration %d of sampling...' % k)
+            # proposal step
+            w_k = np.sqrt(1. - self.beta**2.)*u + KL_scaled_evecs.dot(z[:,k])*self.beta
+
+            # calc acceptance prob, and accept/reject proposal step accordingly
+            acc_prob = alpha(u, w_k)
+            if np.random.rand() <= acc_prob:
+                num_acc += 1
+                u = w_k
+
+            # Record mean if past burn-in stage
+            if k >= burnIn:
+                k_rec = k - burnIn
+                self.u_samples.append(u)
+                if k_rec == 0:
+                    self.u_mean = u
+                    if f == 'thresh':
+                        self.u_t_mean = threshold1D(u.copy())
+                else:
+                    self.u_mean = ((k_rec) * self.u_mean + u)/(k_rec + 1)
+                    if f == 'thresh':
+                        self.u_t_mean = ((k_rec) * self.u_t_mean + threshold1D(u.copy()))/(k_rec+1)
+
+
+        print("number of accepted points = %d" % num_acc)
+
 
 
 
